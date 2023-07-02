@@ -4,24 +4,53 @@
     <title>Parcel Sandbox</title>
     <meta charset="UTF-8" />
 
-    <style>
-      #map {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-      }
-    </style>
     <link
       href="https://api.tiles.mapbox.com/mapbox-gl-js/v1.13.0/mapbox-gl.css"
       rel="stylesheet"
     />
+    
+    <style>
+      body{
+        margin: 0px;
+      } 
+      #maps-container {
+        width:100%;
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      #xyz-map {
+        background-color: #b1b9cd;
+        width:100%;
+        height: 100vh;
+      }
+      #map {
+        background-color: #b1cdbc;
+        width:100%;
+        height: 100vh;
+      }
+      #deck-button-controls {
+        margin: 5px;
+      }
+    </style>
   </head>
 
   <body>
-    <div id="map"></div>
-
+    <div id="maps-container">
+      <div id="xyz-map">XYZ Map</div>
+      <div>
+        <div id="deck-button-controls">
+          <button id="goToNYC">
+            goToNYC
+          </button>
+        </div>
+        <div id="map">
+          MapBox Map
+        </div>  
+      </div>
+      
+    </div>
+    
     <!-- <script type="module" src="src/index.js"></script> -->
     <script src="src/index.js"></script>
   </body>
