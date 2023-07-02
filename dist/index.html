@@ -3,7 +3,9 @@
   <head>
     <title>Parcel Sandbox</title>
     <meta charset="UTF-8">
-
+    <script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
+        
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
     <!-- <style>
       #map {
@@ -22,6 +24,7 @@
         height: 100vh;
         display: grid;
         grid-template-columns: 1fr 1fr;
+        /* grid-template-columns: 1fr; */
       }
       #xyz-map {
         background-color: #b1b9cd;
@@ -51,6 +54,7 @@
     <div id="maps-container">
       <div id="xyz-map">
         <div id="xyzmap"></div>
+        
       </div>
       
       <div>
@@ -61,10 +65,12 @@
         </div>
         <div id="map">
           MapBox Map
+          <div id="deck"></div>
         </div> 
       </div>
       
     </div>
+    
     
     <!-- <script type="module" src="src/index.js"></script> -->
     <script src="/src.a2b27638.js"></script>

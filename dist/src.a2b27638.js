@@ -72762,7 +72762,193 @@ var _solidPolygonLayer = _interopRequireDefault(require("./solid-polygon-layer/s
 var _multiIconLayer = _interopRequireDefault(require("./text-layer/multi-icon-layer/multi-icon-layer"));
 var _textBackgroundLayer = _interopRequireDefault(require("./text-layer/text-background-layer/text-background-layer"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./arc-layer/arc-layer":"node_modules/@deck.gl/layers/dist/esm/arc-layer/arc-layer.js","./bitmap-layer/bitmap-layer":"node_modules/@deck.gl/layers/dist/esm/bitmap-layer/bitmap-layer.js","./icon-layer/icon-layer":"node_modules/@deck.gl/layers/dist/esm/icon-layer/icon-layer.js","./line-layer/line-layer":"node_modules/@deck.gl/layers/dist/esm/line-layer/line-layer.js","./point-cloud-layer/point-cloud-layer":"node_modules/@deck.gl/layers/dist/esm/point-cloud-layer/point-cloud-layer.js","./scatterplot-layer/scatterplot-layer":"node_modules/@deck.gl/layers/dist/esm/scatterplot-layer/scatterplot-layer.js","./column-layer/column-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/column-layer.js","./column-layer/grid-cell-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/grid-cell-layer.js","./path-layer/path-layer":"node_modules/@deck.gl/layers/dist/esm/path-layer/path-layer.js","./polygon-layer/polygon-layer":"node_modules/@deck.gl/layers/dist/esm/polygon-layer/polygon-layer.js","./geojson-layer/geojson-layer":"node_modules/@deck.gl/layers/dist/esm/geojson-layer/geojson-layer.js","./text-layer/text-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-layer.js","./solid-polygon-layer/solid-polygon-layer":"node_modules/@deck.gl/layers/dist/esm/solid-polygon-layer/solid-polygon-layer.js","./text-layer/multi-icon-layer/multi-icon-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/multi-icon-layer/multi-icon-layer.js","./text-layer/text-background-layer/text-background-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-background-layer/text-background-layer.js"}],"node_modules/@here/xyz-maps-common/dist/xyz-maps-common.esm.min.js":[function(require,module,exports) {
+},{"./arc-layer/arc-layer":"node_modules/@deck.gl/layers/dist/esm/arc-layer/arc-layer.js","./bitmap-layer/bitmap-layer":"node_modules/@deck.gl/layers/dist/esm/bitmap-layer/bitmap-layer.js","./icon-layer/icon-layer":"node_modules/@deck.gl/layers/dist/esm/icon-layer/icon-layer.js","./line-layer/line-layer":"node_modules/@deck.gl/layers/dist/esm/line-layer/line-layer.js","./point-cloud-layer/point-cloud-layer":"node_modules/@deck.gl/layers/dist/esm/point-cloud-layer/point-cloud-layer.js","./scatterplot-layer/scatterplot-layer":"node_modules/@deck.gl/layers/dist/esm/scatterplot-layer/scatterplot-layer.js","./column-layer/column-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/column-layer.js","./column-layer/grid-cell-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/grid-cell-layer.js","./path-layer/path-layer":"node_modules/@deck.gl/layers/dist/esm/path-layer/path-layer.js","./polygon-layer/polygon-layer":"node_modules/@deck.gl/layers/dist/esm/polygon-layer/polygon-layer.js","./geojson-layer/geojson-layer":"node_modules/@deck.gl/layers/dist/esm/geojson-layer/geojson-layer.js","./text-layer/text-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-layer.js","./solid-polygon-layer/solid-polygon-layer":"node_modules/@deck.gl/layers/dist/esm/solid-polygon-layer/solid-polygon-layer.js","./text-layer/multi-icon-layer/multi-icon-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/multi-icon-layer/multi-icon-layer.js","./text-layer/text-background-layer/text-background-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-background-layer/text-background-layer.js"}],"src/style.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.style = void 0;
+var style = {
+  backgroundColor: "#ECE0CA",
+  styleGroups: {
+    landuse: [{
+      zIndex: 0,
+      type: "Polygon",
+      fill: "#ECE0CA"
+    }],
+    pier: [{
+      zIndex: 1,
+      type: "Polygon",
+      fill: "#ECE0CA",
+      stroke: "#c8b89d",
+      strokeWidth: 2
+    }],
+    park: [{
+      zIndex: 1,
+      type: "Polygon",
+      fill: "#c8dd97"
+    }],
+    nature_reserve: [{
+      zIndex: 1,
+      type: "Polygon",
+      fill: "#dadeb0"
+    }],
+    hospital: [{
+      zIndex: 1,
+      type: "Polygon",
+      fill: "#f3d3d3"
+    }],
+    water: [{
+      zIndex: 2,
+      type: "Polygon",
+      fill: "rgb(120,188,237)"
+    }],
+    path: [{
+      zIndex: 3,
+      type: "Line",
+      stroke: "#c8b89d",
+      strokeWidth: "1m"
+    }],
+    tunnel: [{
+      zIndex: 3,
+      type: "Line",
+      stroke: "#ffffff",
+      strokeWidth: {
+        15: 4,
+        20: 16
+      },
+      strokeDasharray: [4, 4]
+    }],
+    ferry: [{
+      zIndex: 4,
+      type: "Line",
+      stroke: "#164ac8",
+      strokeWidth: 1
+    }],
+    highway: [{
+      zIndex: 5,
+      type: "Line",
+      stroke: "white",
+      repeat: 128,
+      strokeWidth: {
+        10: 1.5,
+        15: 4,
+        16: "12m"
+      }
+    }],
+    boundaries: [{
+      zIndex: 6,
+      type: "Line",
+      stroke: "#b3b1ad",
+      strokeWidth: {
+        10: 0.5,
+        20: 2
+      }
+    }],
+    buildings: [{
+      zIndex: 7,
+      type: "Polygon",
+      fill: "rgba(170,170,170,0.7)",
+      stroke: "rgba(30,30,30,0.7)",
+      // define extrude in meters to display polygons with extrusion
+      extrude: function extrude(feature) {
+        return feature.properties.height || 0;
+      },
+      // define the base of the extrusion in meters offset from the ground
+      extrudeBase: function extrudeBase(feature) {
+        return feature.properties.min_height || 0;
+      }
+    }],
+    roads: [{
+      zIndex: 4,
+      type: "Line",
+      stroke: "#ffffff",
+      strokeWidth: {
+        15: 1,
+        16: "5m"
+      }
+    }, {
+      zIndex: 6,
+      type: "Text",
+      fill: "#222222",
+      font: "12px sans-serif",
+      strokeWidth: 4,
+      stroke: "white",
+      text: function text(f) {
+        return f.properties.name;
+      },
+      // Minimum distance in pixel between repeated text labels on line geometries.
+      // Applies per tile only. Default is 256 pixel.
+      repeat: 128,
+      // Alignment for Text. "map" aligns to the plane of the map.
+      alignment: "map",
+      // Text with a higher priority (lower value) will be drawn before lower priorities (higher value)
+      // make sure "road labels" are drawn after "place labels".
+      priority: 2
+    }],
+    places: [{
+      zIndex: 8,
+      type: "Text",
+      text: function text(f) {
+        return f.properties.name;
+      },
+      stroke: "black",
+      fill: "white",
+      font: "18px sans-serif",
+      strokeWidth: 4,
+      // set collide property to false to enable label collision detection [default]
+      collide: false,
+      // Alignment for Text. "viewport" aligns to the plane of the viewport/screen.
+      alignment: "viewport",
+      // Text with a higher priority (lower value) will be drawn before lower priorities (higher value)
+      // In case of "place label" and "road label" are colliding "place label" will be draw
+      // because priority 1 is smaller than priority 2
+      priority: 1
+    }]
+  },
+  assign: function assign(feature, zoom) {
+    var props = feature.properties;
+    var kind = props.kind;
+    var layer = props.layer;
+    var geom = feature.geometry.type;
+    if (layer == "landuse") {
+      switch (kind) {
+        case "pier":
+          return "pier";
+        case "nature_reserve":
+          return "nature_reserve";
+        case "park":
+        case "garden":
+        case "pedestrian":
+        case "forrest":
+          return "park";
+        case "hospital":
+          return "hospital";
+        default:
+          return "landuse";
+      }
+    }
+    if (layer == "water") {
+      if (geom == "LineString" || geom == "MultiLineString") {
+        return;
+      }
+    } else if (layer == "roads") {
+      if (kind == "rail" || kind == "ferry") {
+        return;
+      }
+      if (props.is_tunnel && zoom > 13) {
+        return "tunnel";
+      }
+      if (kind == "highway" || kind == "path") {
+        return kind;
+      }
+    }
+    return layer;
+  }
+};
+exports.style = style;
+},{}],"node_modules/@here/xyz-maps-common/dist/xyz-maps-common.esm.min.js":[function(require,module,exports) {
 var global = arguments[3];
 "use strict";
 
@@ -80045,81 +80231,333 @@ bn.Map = wn, bn.styleTools = xt;
 "use strict";
 
 var L = _interopRequireWildcard(require("leaflet"));
-var _deck = require("deck.gl-leaflet");
+var _deck2 = require("deck.gl-leaflet");
 var _core = require("@deck.gl/core");
 var _layers = require("@deck.gl/layers");
+var _style = require("./style");
 var _xyzMapsDisplay = require("@here/xyz-maps-display");
 var _xyzMapsCore = require("@here/xyz-maps-core");
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
 function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
-/* eslint-disable */
-
-// source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
-var AIR_PORTS = "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
-var coords = {
-  longitude: -74.30603020869314,
-  latitude: 40.69074847550857,
-  zoom: 7
-};
-var map = L.map(document.getElementById("map"), {
-  center: [coords.latitude, coords.longitude],
-  zoom: coords.zoom
-});
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
-var deckLayer = new _deck.LeafletLayer({
-  debug: true,
-  views: [new _core.MapView({
-    repeat: true
-  })],
-  layers: []
-});
-map.addLayer(deckLayer);
-var featureGroup = L.featureGroup();
-featureGroup.addLayer(L.marker([51.4709959, -0.4531566]));
-map.addLayer(featureGroup);
+function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, _toPropertyKey(descriptor.key), descriptor); } }
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
+function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
+function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
+function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); } /* eslint-disable */
 var YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 
-// Step1 - Set underlying MVT tiles layer
-var MVT = new _xyzMapsCore.MVTLayer({
-  name: "background layer",
-  // the minimum zoom level the layer is displayed
-  min: 1,
-  // the maximum zoom level the layer is displayed
-  max: 20,
+/** setup the map and "basemap" layer **/
+var baseMapLayer = new _xyzMapsCore.MVTLayer({
+  name: "mvt-world-layer",
   remote: {
     url: "https://xyz.api.here.com/tiles/osmbase/512/all/{z}/{x}/{y}.mvt?access_token=" + YOUR_ACCESS_TOKEN
   }
+  // style: style,
 });
 
-// Step 1.1 - setup the Map Display
+// setup the Map Display
 var display = new _xyzMapsDisplay.Map(document.getElementById("xyzmap"), {
-  zoomlevel: coords.zoom,
+  // zoomlevel: 17,
+  zoomlevel: 11,
   center: {
-    longitude: coords.longitude,
-    latitude: coords.latitude
+    longitude: -80.62089,
+    latitude: 28.627275
   },
-  // add layers to the map
-  layers: [MVT]
+  behavior: {
+    // allow map pitch by user interaction (mouse/touch)
+    // pitch: true,
+    // allow map rotation by user interaction (mouse/touch)
+    // rotate: true,
+  },
+  // set initial map pitch in degrees
+  // pitch: 50,
+  // set initial map rotation in degrees
+  // rotate: 30,
+
+  layers: [baseMapLayer]
 });
 
-// display.addLayer(myLayer);
+// const THREE;
+/** **/
 
-window.deckLayer = deckLayer;
-window.xyzMap = display;
+/***************** XYZ Maps Overlay ****************/
+var XYZMapsDeckOverlay = /*#__PURE__*/function (_CustomLayer) {
+  _inherits(XYZMapsDeckOverlay, _CustomLayer);
+  var _super = _createSuper(XYZMapsDeckOverlay);
+  function XYZMapsDeckOverlay() {
+    var _this;
+    _classCallCheck(this, XYZMapsDeckOverlay);
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+    _this = _super.call.apply(_super, [this].concat(args));
+    _defineProperty(_assertThisInitialized(_this), "min", 0);
+    _defineProperty(_assertThisInitialized(_this), "max", 20);
+    _defineProperty(_assertThisInitialized(_this), "renderOptions", {
+      mode: "2d",
+      zLayer: 1,
+      zIndex: 10
+    });
+    _defineProperty(_assertThisInitialized(_this), "props", void 0);
+    _defineProperty(_assertThisInitialized(_this), "_deck", void 0);
+    _defineProperty(_assertThisInitialized(_this), "_container", void 0);
+    _defineProperty(_assertThisInitialized(_this), "_map", void 0);
+    return _this;
+  }
+  _createClass(XYZMapsDeckOverlay, [{
+    key: "onLayerAdd",
+    value: function onLayerAdd(ev) {
+      var detail = ev.detail;
+      var canvas = detail.canvas,
+        context = detail.context,
+        map = detail.map;
+      var viewState = getViewState(map);
 
-// Update lat long of XYZ map upon move
-map.on("moveend", function () {
-  console.log("Leaflet", map.getZoom());
-  console.log("XYZ Map: ", display.getCenter());
-  display.setCenter({
-    longitude: map.getBounds().getCenter().lng,
-    latitude: map.getBounds().getCenter().lat
-  });
-  display.setZoomlevel(map.getZoom());
+      // const deck = new Deck({
+      //   parent: document.getElementById("xyzmap"),
+      //   controller: false,
+      //   // style: { zIndex: "auto" },
+      //   viewState,
+      // });
+
+      this._container = document.getElementById("xyzmap");
+      var _deck = new _core.Deck({
+        // ...props,
+        parent: this._container,
+        controller: false,
+        // initialViewState: INITIAL_VIEW_STATE,
+        style: {
+          zIndex: "auto"
+        },
+        initialViewState: viewState
+      });
+      window.deck = _deck;
+      this._deck = _deck;
+      console.log("onLayerAdd: ev", ev);
+
+      // const size = this._map.getSize();
+      // this._container.style.width = `${size.x}px`;
+      // this._container.style.height = `${size.y}px`;
+    }
+  }, {
+    key: "render",
+    value: function render(context, matrix) {
+      // console.log("context: ", context);
+      // console.log("matrix: ", matrix);
+    }
+
+    /**
+     * @param {DeckProps} props
+     * @returns {void}
+     */
+  }, {
+    key: "setProps",
+    value: function setProps(props) {
+      // Object.assign(this.props, props);
+
+      if (this._deck) {
+        this._deck.setProps(props);
+      }
+    }
+
+    // camera;
+    // scene;
+    // renderer;
+  }]);
+  return XYZMapsDeckOverlay;
+}(_xyzMapsCore.CustomLayer);
+/**
+ * @param {Map} @here/xyz-maps-display
+ * @returns {ViewStateProps}
+ */
+function getViewState(map) {
+  return {
+    longitude: map.getCenter().longitude,
+    latitude: map.getCenter().latitude,
+    zoom: map.getZoomlevel(),
+    pitch: 0,
+    bearing: 0
+  };
+}
+window.map = display;
+
+// source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
+var AIR_PORTS = "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
+var layers = [new _layers.GeoJsonLayer({
+  id: "airports",
+  data: AIR_PORTS,
+  // Styles
+  filled: true,
+  pointRadiusMinPixels: 2,
+  pointRadiusScale: 2000,
+  getPointRadius: function getPointRadius(f) {
+    return 11 - f.properties.scalerank;
+  },
+  getFillColor: [200, 0, 80, 180],
+  // Interactive props
+  pickable: true,
+  autoHighlight: true,
+  onClick: function onClick(info) {
+    return (
+      // eslint-disable-next-line
+      info.object && alert("".concat(info.object.properties.name, " (").concat(info.object.properties.abbrev, ")"))
+    );
+  }
+}), new _layers.ArcLayer({
+  id: "arcs",
+  data: AIR_PORTS,
+  dataTransform: function dataTransform(d) {
+    return d.features.filter(function (f) {
+      return f.properties.scalerank < 4;
+    });
+  },
+  // Styles
+  getSourcePosition: function getSourcePosition(f) {
+    return [-0.4531566, 51.4709959];
+  },
+  // London
+  getTargetPosition: function getTargetPosition(f) {
+    return f.geometry.coordinates;
+  },
+  getSourceColor: [0, 128, 200],
+  getTargetColor: [200, 0, 80],
+  getWidth: 1
+}), new _layers.ScatterplotLayer({
+  data: [{
+    position: [-80.62089, 28.627275],
+    color: [255, 0, 0],
+    radius: 1000
+  }],
+  getPosition: function getPosition(d) {
+    return d.position;
+  },
+  getColor: function getColor(d) {
+    return d.color;
+  },
+  getRadius: function getRadius(d) {
+    return d.radius;
+  },
+  opacity: 0.3
+})];
+var hereXyzMapsDeckOverlay = new XYZMapsDeckOverlay();
+hereXyzMapsDeckOverlay.setProps({
+  layers: []
 });
-},{"leaflet":"node_modules/leaflet/dist/leaflet-src.js","deck.gl-leaflet":"node_modules/deck.gl-leaflet/dist/deck.gl-leaflet.min.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","@here/xyz-maps-display":"node_modules/@here/xyz-maps-display/dist/xyz-maps-display.esm.min.js","@here/xyz-maps-core":"node_modules/@here/xyz-maps-core/dist/xyz-maps-core.min.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+display.addLayer(hereXyzMapsDeckOverlay);
+hereXyzMapsDeckOverlay.setProps({
+  layers: layers
+});
+
+/************Temp  */
+
+/************** temp end  */
+// const mapCenter = display.getCenter();
+
+// place the model in the center of the map
+// const modelPosition = [mapCenter.longitude, mapCenter.latitude, 0];
+
+// // project to webMercator coordinates with a world size of 1.
+// const modelPositionProjected = {
+//   x: webMercator.lon2x(modelPosition[0], 1),
+//   y: webMercator.lat2y(modelPosition[1], 1),
+//   z: webMercator.alt2z(modelPosition[2], modelPosition[1]),
+// };
+// // get the scale to convert from meters to pixel in webMercator space
+// const scaleMeterToPixel =
+//   1 / webMercator.earthCircumference(mapCenter.latitude);
+
+// // transform the model to fit map
+// const modelTransformation = {
+//   translateX: modelPositionProjected.x,
+//   translateY: modelPositionProjected.y,
+//   translateZ: modelPositionProjected.z,
+//   rotateX: Math.PI / 2,
+//   scale: scaleMeterToPixel,
+// };
+
+// Use Threejs as an example of a custom renderer that's being integrated into the map by using the "CustomLayer" functionality.
+// class MyCustomLayer extends CustomLayer {
+//   min = 10;
+//   max = 20;
+
+//   renderOptions = {
+//     mode: "2d",
+//     zLayer: 1,
+//     zIndex: 7,
+//   };
+
+//   onLayerAdd(ev) {
+//     const { detail } = ev;
+//     const { canvas, context } = detail;
+
+//     console.log("ev", ev);
+//     this.camera = new THREE.Camera();
+//     this.scene = new THREE.Scene();
+
+//     // load the model
+//     const loader = new THREE.GLTFLoader();
+//     loader.load(
+//       "https://xyz.api.here.com/maps/playground/assets/models/ML_HP/ML_HP.gltf",
+//       (gltf) => this.scene.add(gltf.scene)
+//     );
+
+//     // Use two Directional lights to illuminate the model
+//     const light1 = new THREE.DirectionalLight(0xffffff);
+//     light1.position.set(200, 150, 50);
+//     this.scene.add(light1);
+
+//     const light2 = new THREE.DirectionalLight(0xffffff);
+//     this.scene.add(light2);
+
+//     this.renderer = new THREE.WebGLRenderer({ canvas, context });
+//     this.renderer.autoClear = false;
+//   }
+
+//   render(context, matrix) {
+//     const rotX = new THREE.Matrix4().makeRotationAxis(
+//       new THREE.Vector3(1, 0, 0),
+//       modelTransformation.rotateX
+//     );
+
+//     const modelMatrix = new THREE.Matrix4()
+//       .makeTranslation(
+//         modelTransformation.translateX,
+//         modelTransformation.translateY,
+//         modelTransformation.translateZ
+//       )
+//       .scale(
+//         new THREE.Vector3(
+//           modelTransformation.scale,
+//           -modelTransformation.scale,
+//           modelTransformation.scale
+//         )
+//       )
+//       .multiply(rotX);
+
+//     this.camera.projectionMatrix = new THREE.Matrix4()
+//       .fromArray(matrix)
+//       .multiply(modelMatrix);
+//     this.renderer.resetState();
+//     this.renderer.render(this.scene, this.camera);
+//   }
+
+//   camera;
+//   scene;
+//   renderer;
+// }
+
+// const myCustomLayer = new MyCustomLayer();
+// display.addLayer(myCustomLayer);
+},{"leaflet":"node_modules/leaflet/dist/leaflet-src.js","deck.gl-leaflet":"node_modules/deck.gl-leaflet/dist/deck.gl-leaflet.min.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","./style":"src/style.js","@here/xyz-maps-display":"node_modules/@here/xyz-maps-display/dist/xyz-maps-display.esm.min.js","@here/xyz-maps-core":"node_modules/@here/xyz-maps-core/dist/xyz-maps-core.min.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -80144,7 +80582,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "36335" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "45729" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
