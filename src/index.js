@@ -12,14 +12,26 @@ const AIR_PORTS =
   "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
 
 const coords = {
-  longitude: -122.227791,
-  latitude: 37.781058,
-  zoom: 17,
+  longitude: -74.30603020869314,
+  latitude: 40.69074847550857,
+  zoom: 7,
 };
 
 const map = L.map(document.getElementById("map"), {
   center: [coords.latitude, coords.longitude],
   zoom: coords.zoom,
+});
+
+// Update lat long of XYZ map upon move
+map.on("moveend", function () {
+  console.log("Leaflet", map.getZoom());
+  console.log("XYZ Map: ", display.getCenter());
+
+  display.setCenter({
+    longitude: map.getBounds().getCenter().lng,
+    latitude: map.getBounds().getCenter().lat,
+  });
+  display.setZoomlevel(map.getZoom());
 });
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -76,9 +88,3 @@ display.addLayer(myLayer);
 
 window.deckLayer = deckLayer;
 window.xyzMap = display;
-
-// Update lat long of XYZ map upon move
-map.on("moveend", function () {
-  console.log(map.getCenter());
-  // display.setCenter();
-});
