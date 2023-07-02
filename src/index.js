@@ -22,18 +22,6 @@ const map = L.map(document.getElementById("map"), {
   zoom: coords.zoom,
 });
 
-// Update lat long of XYZ map upon move
-map.on("moveend", function () {
-  console.log("Leaflet", map.getZoom());
-  console.log("XYZ Map: ", display.getCenter());
-
-  display.setCenter({
-    longitude: map.getBounds().getCenter().lng,
-    latitude: map.getBounds().getCenter().lat,
-  });
-  display.setZoomlevel(map.getZoom());
-});
-
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution:
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -81,10 +69,19 @@ const display = new Map(document.getElementById("xyzmap"), {
   layers: [MVT],
 });
 
-// Add dataset layer to display object
-display.addLayer(dataTileLayer);
-
-display.addLayer(myLayer);
+// display.addLayer(myLayer);
 
 window.deckLayer = deckLayer;
 window.xyzMap = display;
+
+// Update lat long of XYZ map upon move
+map.on("moveend", function () {
+  console.log("Leaflet", map.getZoom());
+  console.log("XYZ Map: ", display.getCenter());
+
+  display.setCenter({
+    longitude: map.getBounds().getCenter().lng,
+    latitude: map.getBounds().getCenter().lat,
+  });
+  display.setZoomlevel(map.getZoom());
+});

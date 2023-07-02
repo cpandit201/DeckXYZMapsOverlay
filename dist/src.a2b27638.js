@@ -80065,17 +80065,6 @@ var map = L.map(document.getElementById("map"), {
   center: [coords.latitude, coords.longitude],
   zoom: coords.zoom
 });
-
-// Update lat long of XYZ map upon move
-map.on("moveend", function () {
-  console.log("Leaflet", map.getZoom());
-  console.log("XYZ Map: ", display.getCenter());
-  display.setCenter({
-    longitude: map.getBounds().getCenter().lng,
-    latitude: map.getBounds().getCenter().lat
-  });
-  display.setZoomlevel(map.getZoom());
-});
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
@@ -80115,11 +80104,21 @@ var display = new _xyzMapsDisplay.Map(document.getElementById("xyzmap"), {
   layers: [MVT]
 });
 
-// Add dataset layer to display object
-display.addLayer(dataTileLayer);
-display.addLayer(myLayer);
+// display.addLayer(myLayer);
+
 window.deckLayer = deckLayer;
 window.xyzMap = display;
+
+// Update lat long of XYZ map upon move
+map.on("moveend", function () {
+  console.log("Leaflet", map.getZoom());
+  console.log("XYZ Map: ", display.getCenter());
+  display.setCenter({
+    longitude: map.getBounds().getCenter().lng,
+    latitude: map.getBounds().getCenter().lat
+  });
+  display.setZoomlevel(map.getZoom());
+});
 },{"leaflet":"node_modules/leaflet/dist/leaflet-src.js","deck.gl-leaflet":"node_modules/deck.gl-leaflet/dist/deck.gl-leaflet.min.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","@here/xyz-maps-display":"node_modules/@here/xyz-maps-display/dist/xyz-maps-display.esm.min.js","@here/xyz-maps-core":"node_modules/@here/xyz-maps-core/dist/xyz-maps-core.min.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
