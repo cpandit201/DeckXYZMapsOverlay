@@ -8,6 +8,9 @@
     "build": "parcel build index.html"
   },
   "dependencies": {
+    "@here/xyz-maps-common": "0.32.0",
+    "@here/xyz-maps-core": "0.32.0",
+    "@here/xyz-maps-display": "0.32.0",
     "@deck.gl/core": "8.9.4",
     "@deck.gl/layers": "8.9.4",
     "deck.gl-leaflet": "^1.2.1",
