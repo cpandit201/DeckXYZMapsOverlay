@@ -66,8 +66,8 @@ class XYZMapsDeckOverlay extends CustomLayer {
 
   renderOptions = {
     mode: "2d",
-    zLayer: 999,
-    zIndex: 999,
+    // zLayer: 99,
+    // zIndex: 99,
   };
 
   onLayerAdd(ev) {
@@ -80,7 +80,7 @@ class XYZMapsDeckOverlay extends CustomLayer {
       initialViewState: viewState,
       controller: true,
       layers: [layers],
-      style: { zIndex: "auto" },
+      // style: { zIndex: "auto" },
     });
 
     window._deckGL = deckgl;
@@ -217,8 +217,8 @@ const layers = [
 ];
 
 const hereXyzMapsDeckOverlay = new XYZMapsDeckOverlay({
-  zLayer: 5,
-  zIndex: 6,
+  // zLayer: 1,
+  // zIndex: 9,
 });
 
 display.addLayer(hereXyzMapsDeckOverlay);
