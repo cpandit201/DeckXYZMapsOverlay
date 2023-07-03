@@ -86,6 +86,7 @@ class XYZMapsDeckOverlay extends CustomLayer {
     window._deckGL = deckgl;
     this._deck = deckgl;
     this._map = map;
+    // this._map = map;
     updateDeckView(deckgl, map);
     // const deck = new Deck({
     //   parent: document.getElementById("xyzmap"),
@@ -116,7 +117,7 @@ class XYZMapsDeckOverlay extends CustomLayer {
     // console.log("context: ", context);
     // console.log("matrix: ", matrix);
     console.log(this._map);
-    updateDeckView(this._deck, this._map);
+    // updateDeckView(this._deck, this._map);
   }
 
   /**
