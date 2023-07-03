@@ -116,8 +116,7 @@ class XYZMapsDeckOverlay extends CustomLayer {
   render(context, matrix) {
     // console.log("context: ", context);
     // console.log("matrix: ", matrix);
-    console.log(this._map);
-    // updateDeckView(this._deck, this._map);
+    updateDeckView(this._deck, this._map);
   }
 
   /**
