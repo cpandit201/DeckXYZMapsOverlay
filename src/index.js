@@ -1,58 +1,91 @@
-import { MapboxOverlay as DeckOverlay } from "@deck.gl/mapbox";
-import { GeoJsonLayer, ArcLayer } from "@deck.gl/layers";
-import mapboxgl from "mapbox-gl";
+// Deck Imports
+import { Deck } from "@deck.gl/core";
+import { MapView } from "@deck.gl/core";
+import { layers } from "./deckLayers";
 
-// source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
-const AIR_PORTS =
-  "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
+// XYZ Imports
+import { Map } from "@here/xyz-maps-display";
+import {
+  MVTLayer,
+  TileLayer,
+  SpaceProvider,
+  CustomLayer,
+  webMercator,
+} from "@here/xyz-maps-core";
+const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
+import { style } from "./style";
 
-mapboxgl.accessToken =
-  "pk.eyJ1IjoiZGVhZG5pZ2h0NyIsImEiOiJjanJzeWY1dGkwMWQ4NDNsZmJjaGNsemZ3In0.WglAlgSd9imV5C778hJ0cA";
-const map = new mapboxgl.Map({
-  container: "map",
-  style:
-    "https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json",
-  center: [0.45, 51.47],
+const INITIAL_VIEW_STATE = {
+  latitude: 51.47,
+  longitude: 0.45,
   zoom: 4,
   bearing: 0,
-  pitch: 30
+  pitch: 30,
+};
+
+// Setup Deck GL
+const deckgl = new Deck({
+  // parent: canvas,
+  // parent: document.getElementById("deck-canvas"),
+  controller: true,
+  layers: layers,
+  canvas: "deck-canvas",
+  width: "100%",
+  height: "100%",
+  initialViewState: INITIAL_VIEW_STATE,
+  controller: true,
+  // style: { zIndex: "auto" },
 });
 
-const deckOverlay = new DeckOverlay({
-  layers: [
-    new GeoJsonLayer({
-      id: "airports",
-      data: AIR_PORTS,
-      // Styles
-      filled: true,
-      pointRadiusMinPixels: 2,
-      pointRadiusScale: 2000,
-      getPointRadius: (f) => 11 - f.properties.scalerank,
-      getFillColor: [200, 0, 80, 180],
-      // Interactive props
-      pickable: true,
-      autoHighlight: true,
-      onClick: (info) =>
-        // eslint-disable-next-line
-        info.object &&
-        alert(
-          `${info.object.properties.name} (${info.object.properties.abbrev})`
-        )
-    }),
-    new ArcLayer({
-      id: "arcs",
-      data: AIR_PORTS,
-      dataTransform: (d) =>
-        d.features.filter((f) => f.properties.scalerank < 4),
-      // Styles
-      getSourcePosition: (f) => [-0.4531566, 51.4709959], // London
-      getTargetPosition: (f) => f.geometry.coordinates,
-      getSourceColor: [0, 128, 200],
-      getTargetColor: [200, 0, 80],
-      getWidth: 1
-    })
-  ]
+/** setup the XYZ map and "basemap" layer **/
+const baseMapLayer = new MVTLayer({
+  name: "mvt-world-layer",
+  zIndex: 1,
+  remote: {
+    url:
+      "https://xyz.api.here.com/tiles/osmbase/512/all/{z}/{x}/{y}.mvt?access_token=" +
+      YOUR_ACCESS_TOKEN,
+  },
+  style: style,
 });
 
-map.addControl(deckOverlay);
-map.addControl(new mapboxgl.NavigationControl());
+// setup the Map Display
+const map = new Map(document.getElementById("map-canvas"), {
+  zoomlevel: INITIAL_VIEW_STATE.zoom,
+  center: {
+    longitude: INITIAL_VIEW_STATE.longitude,
+    latitude: INITIAL_VIEW_STATE.latitude,
+  },
+  layers: [baseMapLayer],
+  behavior: {
+    // allow map pitch by user interaction (mouse/touch)
+    // pitch: true,
+    // allow map rotation by user interaction (mouse/touch)
+    // rotate: true,
+  },
+  // set initial map pitch in degrees
+  // pitch: 50,
+  // set initial map rotation in degrees
+  // rotate: 30,
+});
+
+/**
+ * @map - { Map } from "@here/xyz-maps-display"
+ * viewState : {
+      latitude: number,
+      longitude: number,
+      zoom: number,
+      bearing: number,
+      pitch: number,
+    };
+ */
+const updateMapCamera = (map) => {};
+
+deckgl.setProps({
+  onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState),
+  // onResize: ({ width, height }) => map.resize(width, height),
+});
+
+// add renderers to window object
+window.xyzmap = map;
+window.deckoverlay = deckgl;

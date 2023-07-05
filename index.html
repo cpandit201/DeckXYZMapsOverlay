@@ -3,25 +3,35 @@
   <head>
     <title>Parcel Sandbox</title>
     <meta charset="UTF-8" />
-
     <style>
-      #map {
+
+      #container {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
       }
+      #container > * {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
     </style>
-    <link
-      href="https://api.tiles.mapbox.com/mapbox-gl-js/v1.13.0/mapbox-gl.css"
-      rel="stylesheet"
-    />
   </head>
 
   <body>
-    <div id="map"></div>
-
+    
+    <div id="container">
+      Map Canvas: <div id="map-canvas"></div>
+      Deck Canvas: <canvas id="deck-canvas"></canvas>
+      
+      
+    </div>
+    
     <!-- <script type="module" src="src/index.js"></script> -->
     <script src="src/index.js"></script>
   </body>
