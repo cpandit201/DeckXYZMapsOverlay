@@ -34,11 +34,13 @@ const deckgl = new Deck({
   height: "100%",
   initialViewState: INITIAL_VIEW_STATE,
   controller: true,
-  // style: { zIndex: "auto" },
+  style: { zIndex: "auto" },
 });
 
 /** setup the XYZ map and "basemap" layer **/
 const baseMapLayer = new MVTLayer({
+  min: 3,
+  max: 20,
   name: "mvt-world-layer",
   zIndex: 1,
   remote: {
