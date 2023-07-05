@@ -65784,6 +65784,7 @@ var _deckLayers = require("./deckLayers");
 var _xyzMapsDisplay = require("@here/xyz-maps-display");
 var _xyzMapsCore = require("@here/xyz-maps-core");
 var _style = require("./style");
+var _Deck;
 function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
 function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
@@ -65799,7 +65800,7 @@ var INITIAL_VIEW_STATE = {
 };
 
 // Setup Deck GL
-var deckgl = new _core.Deck(_defineProperty({
+var deckgl = new _core.Deck((_Deck = {
   // parent: canvas,
   // parent: document.getElementById("deck-canvas"),
   controller: true,
@@ -65808,10 +65809,14 @@ var deckgl = new _core.Deck(_defineProperty({
   width: "100%",
   height: "100%",
   initialViewState: INITIAL_VIEW_STATE
-}, "controller", true));
+}, _defineProperty(_Deck, "controller", true), _defineProperty(_Deck, "style", {
+  zIndex: "auto"
+}), _Deck));
 
 /** setup the XYZ map and "basemap" layer **/
 var baseMapLayer = new _xyzMapsCore.MVTLayer({
+  min: 3,
+  max: 20,
   name: "mvt-world-layer",
   zIndex: 1,
   remote: {
