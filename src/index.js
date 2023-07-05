@@ -19,8 +19,8 @@ const INITIAL_VIEW_STATE = {
   latitude: 51.47,
   longitude: 0.45,
   zoom: 4,
-  bearing: 0,
-  pitch: 30,
+  // bearing: 0,
+  // pitch: 30,
 };
 
 // Setup Deck GL
@@ -79,11 +79,15 @@ const map = new Map(document.getElementById("map-canvas"), {
       pitch: number,
     };
  */
-const updateMapCamera = (map) => {};
+const updateMapCamera = (map, viewState) => {
+  console.log(viewState);
+  map.setCenter(viewState.longitude, viewState.latitude);
+  map.setZoomlevel(viewState.zoom);
+};
 
 deckgl.setProps({
   onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState),
-  // onResize: ({ width, height }) => map.resize(width, height),
+  onResize: ({ width, height }) => map.resize(width, height),
 });
 
 // add renderers to window object

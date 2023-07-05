@@ -65793,9 +65793,9 @@ var YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 var INITIAL_VIEW_STATE = {
   latitude: 51.47,
   longitude: 0.45,
-  zoom: 4,
-  bearing: 0,
-  pitch: 30
+  zoom: 4
+  // bearing: 0,
+  // pitch: 30,
 };
 
 // Setup Deck GL
@@ -65850,13 +65850,21 @@ var map = new _xyzMapsDisplay.Map(document.getElementById("map-canvas"), {
       pitch: number,
     };
  */
-var updateMapCamera = function updateMapCamera(map) {};
+var updateMapCamera = function updateMapCamera(map, viewState) {
+  console.log(viewState);
+  map.setCenter(viewState.longitude, viewState.latitude);
+  map.setZoomlevel(viewState.zoom);
+};
 deckgl.setProps({
   onViewStateChange: function onViewStateChange(_ref) {
     var viewState = _ref.viewState;
     return updateMapCamera(map, viewState);
+  },
+  onResize: function onResize(_ref2) {
+    var width = _ref2.width,
+      height = _ref2.height;
+    return map.resize(width, height);
   }
-  // onResize: ({ width, height }) => map.resize(width, height),
 });
 
 // add renderers to window object
