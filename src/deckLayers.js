@@ -1,12 +1,34 @@
 import { GeoJsonLayer, ArcLayer, ScatterplotLayer } from "@deck.gl/layers";
 
+import { HeatmapLayer } from "@deck.gl/aggregation-layers";
+
 // source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
 export const dataSource = {
   AIR_PORTS:
     "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson",
+
+  HEAT_MAPS:
+    "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/screen-grid/uber-pickup-locations.json",
 };
 
+const intensity = 1;
+const threshold = 0.03;
+const radiusPixels = 30;
+
 export const layers = [
+  new HeatmapLayer({
+    data: dataSource.HEAT_MAPS,
+    id: "heatmp-layer",
+    pickable: false,
+    getPosition: (d) => [d[0], d[1]],
+    getWeight: (d) => d[2],
+    radiusPixels,
+    intensity,
+    threshold,
+  }),
+];
+
+export const layers1 = [
   new GeoJsonLayer({
     id: "airports",
     data: dataSource.AIR_PORTS,

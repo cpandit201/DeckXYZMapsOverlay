@@ -16,11 +16,11 @@ const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
-  latitude: 51.47,
-  longitude: 0.45,
-  zoom: 4,
+  longitude: -73.75,
+  latitude: 40.73,
+  zoom: 9,
   // bearing: 0,
-  // pitch: 30,
+  // pitch: 0,
 };
 
 // Setup Deck GL
@@ -35,12 +35,13 @@ const deckgl = new Deck({
   initialViewState: INITIAL_VIEW_STATE,
   controller: true,
   style: { zIndex: "auto" },
+  views: new MapView({
+    repeat: true,
+  }),
 });
 
 /** setup the XYZ map and "basemap" layer **/
 const baseMapLayer = new MVTLayer({
-  min: 3,
-  max: 20,
   name: "mvt-world-layer",
   zIndex: 1,
   remote: {
@@ -48,7 +49,7 @@ const baseMapLayer = new MVTLayer({
       "https://xyz.api.here.com/tiles/osmbase/512/all/{z}/{x}/{y}.mvt?access_token=" +
       YOUR_ACCESS_TOKEN,
   },
-  style: style,
+  // style: style,
 });
 
 // setup the Map Display
@@ -71,6 +72,10 @@ const map = new Map(document.getElementById("map-canvas"), {
   // rotate: 30,
 });
 
+// add renderers to window object
+window.xyzmap = map;
+window.deckoverlay = deckgl;
+
 /**
  * @map - { Map } from "@here/xyz-maps-display"
  * viewState : {
@@ -82,16 +87,29 @@ const map = new Map(document.getElementById("map-canvas"), {
     };
  */
 const updateMapCamera = (map, viewState) => {
-  console.log(viewState);
+  // console.log(viewState);
+  const bbox = [
+    [map.getViewBounds().maxLon, map.getViewBounds().maxLat],
+    [map.getViewBounds().minLon, map.getViewBounds().maxLat],
+  ];
+  // console.log("bbox", bbox);
+  // const viewport = window.deckoverlay.getViewports()[0];
+  // const { latitude, longitude, zoom } = viewport.fitBounds(bbox);
+  // console.log(latitude, longitude, zoom);
+  // map.setCenter(latitude, longitude);
   map.setCenter(viewState.longitude, viewState.latitude);
   map.setZoomlevel(viewState.zoom);
+
+  console.log(
+    "map.getCenter: ",
+    map.getCenter(),
+    "zoom : ",
+    map.getZoomlevel()
+  );
+  console.log("viewState: ", viewState);
 };
 
 deckgl.setProps({
   onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState),
-  onResize: ({ width, height }) => map.resize(width, height),
+  // onResize: ({ width, height }) => map.resize(width, height),
 });
-
-// add renderers to window object
-window.xyzmap = map;
-window.deckoverlay = deckgl;

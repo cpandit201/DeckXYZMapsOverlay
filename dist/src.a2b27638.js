@@ -10408,7 +10408,7 @@ var _debug = require("../debug");
 var _jsonLoader = _interopRequireDefault(require("../utils/json-loader"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 function checkVersion() {
-  const version = typeof "8.9.4" !== 'undefined' ? "8.9.4" : globalThis.DECK_VERSION || 'untranspiled source';
+  const version = typeof "8.9.19" !== 'undefined' ? "8.9.19" : globalThis.DECK_VERSION || 'untranspiled source';
   const existingVersion = globalThis.deck && globalThis.deck.VERSION;
   if (existingVersion && existingVersion !== version) {
     throw new Error("deck.gl - multiple versions detected: ".concat(existingVersion, " vs ").concat(version));
@@ -37415,7 +37415,7 @@ class ViewManager {
   }
   _updateController(view, viewState, viewport, controller) {
     const controllerProps = view.controller;
-    if (controllerProps) {
+    if (controllerProps && viewport) {
       const resolvedProps = {
         ...viewState,
         ...controllerProps,
@@ -37425,7 +37425,7 @@ class ViewManager {
         width: viewport.width,
         height: viewport.height
       };
-      if (!controller) {
+      if (!controller || controller.constructor !== view.ControllerType) {
         controller = this._createController(view, resolvedProps);
       }
       if (controller) {
@@ -37461,7 +37461,9 @@ class ViewManager {
         oldController = null;
       }
       this.controllers[view.id] = this._updateController(view, viewState, viewport, oldController);
-      this._viewports.unshift(viewport);
+      if (viewport) {
+        this._viewports.unshift(viewport);
+      }
     }
     for (const id in oldControllers) {
       const oldController = oldControllers[id];
@@ -37606,6 +37608,9 @@ class View {
       width,
       height
     });
+    if (!viewportDimensions.height || !viewportDimensions.width) {
+      return null;
+    }
     return new this.ViewportType({
       ...viewState,
       ...this.props,
@@ -38225,7 +38230,7 @@ class Controller {
     } = props;
     const isInteractive = Boolean(this.onViewStateChange);
     this.toggleEvents(EVENT_TYPES.WHEEL, isInteractive && scrollZoom);
-    this.toggleEvents(EVENT_TYPES.PAN, isInteractive && (dragPan || dragRotate));
+    this.toggleEvents(EVENT_TYPES.PAN, isInteractive);
     this.toggleEvents(EVENT_TYPES.PINCH, isInteractive && (touchZoom || touchRotate));
     this.toggleEvents(EVENT_TYPES.TRIPLE_PAN, isInteractive && touchRotate);
     this.toggleEvents(EVENT_TYPES.DOUBLE_TAP, isInteractive && doubleClickZoom);
@@ -40021,11 +40026,13 @@ class Tooltip {
       if (displayInfo.className) {
         el.className = displayInfo.className;
       }
-      Object.assign(el.style, displayInfo.style);
     }
     this.isVisible = true;
     el.style.display = 'block';
     el.style.transform = "translate(".concat(x, "px, ").concat(y, "px)");
+    if (displayInfo && typeof displayInfo === 'object' && 'style' in displayInfo) {
+      Object.assign(el.style, displayInfo.style);
+    }
   }
   remove() {
     if (this.el) {
@@ -43883,8 +43890,8 @@ class Deck {
     this.animationLoop.start();
   }
   finalize() {
-    var _this$layerManager, _this$viewManager, _this$effectManager, _this$deckRenderer, _this$deckPicker, _this$eventManager, _this$tooltip;
-    this.animationLoop.stop();
+    var _this$animationLoop, _this$layerManager, _this$viewManager, _this$effectManager, _this$deckRenderer, _this$deckPicker, _this$eventManager, _this$tooltip;
+    (_this$animationLoop = this.animationLoop) === null || _this$animationLoop === void 0 ? void 0 : _this$animationLoop.stop();
     this.animationLoop = null;
     this._lastPointerDownInfo = null;
     (_this$layerManager = this.layerManager) === null || _this$layerManager === void 0 ? void 0 : _this$layerManager.finalize();
@@ -44068,22 +44075,24 @@ class Deck {
     }
   }
   _updateCanvasSize() {
+    var _canvas$clientWidth, _canvas$clientHeight;
     const {
       canvas
     } = this;
     if (!canvas) {
       return;
     }
-    const newWidth = canvas.clientWidth || canvas.width;
-    const newHeight = canvas.clientHeight || canvas.height;
+    const newWidth = (_canvas$clientWidth = canvas.clientWidth) !== null && _canvas$clientWidth !== void 0 ? _canvas$clientWidth : canvas.width;
+    const newHeight = (_canvas$clientHeight = canvas.clientHeight) !== null && _canvas$clientHeight !== void 0 ? _canvas$clientHeight : canvas.height;
     if (newWidth !== this.width || newHeight !== this.height) {
-      var _this$viewManager2;
+      var _this$viewManager2, _this$layerManager2;
       this.width = newWidth;
       this.height = newHeight;
       (_this$viewManager2 = this.viewManager) === null || _this$viewManager2 === void 0 ? void 0 : _this$viewManager2.setProps({
         width: newWidth,
         height: newHeight
       });
+      (_this$layerManager2 = this.layerManager) === null || _this$layerManager2 === void 0 ? void 0 : _this$layerManager2.activateViewport(this.getViewports()[0]);
       this.props.onResize({
         width: newWidth,
         height: newHeight
@@ -44106,6 +44115,7 @@ class Deck {
       width,
       height,
       useDevicePixels,
+      autoResizeDrawingBuffer: !gl,
       autoResizeViewport: false,
       gl,
       onCreateContext: opts => (0, _core.createGLContext)({
@@ -46659,7 +46669,7 @@ const DEFAULT_TEXTURE_PARAMETERS = {
   [10243]: 33071
 };
 const internalTextures = {};
-function createTexture(gl, image, parameters) {
+function createTexture(owner, gl, image, parameters) {
   if (image instanceof _core.Texture2D) {
     return image;
   } else if (image.constructor && image.constructor.name !== 'Object') {
@@ -46681,14 +46691,14 @@ function createTexture(gl, image, parameters) {
       ...parameters
     }
   });
-  internalTextures[texture.id] = true;
+  internalTextures[texture.id] = owner;
   return texture;
 }
-function destroyTexture(texture) {
+function destroyTexture(owner, texture) {
   if (!texture || !(texture instanceof _core.Texture2D)) {
     return;
   }
-  if (internalTextures[texture.id]) {
+  if (internalTextures[texture.id] === owner) {
     texture.delete();
     delete internalTextures[texture.id];
   }
@@ -46783,13 +46793,13 @@ const TYPE_DEFINITIONS = {
       if (!context || !context.gl) {
         return null;
       }
-      return (0, _texture.createTexture)(context.gl, value, {
+      return (0, _texture.createTexture)(component.id, context.gl, value, {
         ...propType.parameters,
         ...component.props.textureParameters
       });
     },
-    release: value => {
-      (0, _texture.destroyTexture)(value);
+    release: (value, propType, component) => {
+      (0, _texture.destroyTexture)(component.id, value);
     }
   }
 };
@@ -47038,9 +47048,9 @@ function getOwnProperty(object, prop) {
   return hasOwnProperty(object, prop) && object[prop];
 }
 function getComponentName(componentClass) {
-  const componentName = getOwnProperty(componentClass, 'layerName') || getOwnProperty(componentClass, 'componentName');
+  const componentName = componentClass.componentName;
   if (!componentName) {
-    _log.default.once(0, "".concat(componentClass.name, ".componentName not specified"))();
+    _log.default.warn("".concat(componentClass.name, ".componentName not specified"))();
   }
   return componentName || componentClass.name;
 }
@@ -47587,6 +47597,9 @@ class Layer extends _component.default {
     (0, _defineProperty2.default)(this, "state", void 0);
     (0, _defineProperty2.default)(this, "parent", null);
   }
+  static get componentName() {
+    return Object.prototype.hasOwnProperty.call(this, 'layerName') ? this.layerName : '';
+  }
   get root() {
     let layer = this;
     while (layer.parent) {
@@ -47957,7 +47970,29 @@ class Layer extends _component.default {
     model.setAttributes(shaderAttributes);
   }
   disablePickingIndex(objectIndex) {
-    this._disablePickingIndex(objectIndex);
+    const data = this.props.data;
+    if (!('attributes' in data)) {
+      this._disablePickingIndex(objectIndex);
+      return;
+    }
+    const {
+      pickingColors,
+      instancePickingColors
+    } = this.getAttributeManager().attributes;
+    const colors = pickingColors || instancePickingColors;
+    const externalColorAttribute = colors && data.attributes && data.attributes[colors.id];
+    if (externalColorAttribute && externalColorAttribute.value) {
+      const values = externalColorAttribute.value;
+      const objectColor = this.encodePickingColor(objectIndex);
+      for (let index = 0; index < data.length; index++) {
+        const i = colors.getVertexOffset(index);
+        if (values[i] === objectColor[0] && values[i + 1] === objectColor[1] && values[i + 2] === objectColor[2]) {
+          this._disablePickingIndex(index);
+        }
+      }
+    } else {
+      this._disablePickingIndex(objectIndex);
+    }
   }
   _disablePickingIndex(objectIndex) {
     const {
@@ -49653,6 +49688,9 @@ var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/es
 var _deepEqual = require("../utils/deep-equal");
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 class LayerExtension {
+  static get componentName() {
+    return Object.prototype.hasOwnProperty.call(this, 'extensionName') ? this.extensionName : '';
+  }
   constructor(opts) {
     (0, _defineProperty2.default)(this, "opts", void 0);
     if (opts) {
@@ -49701,6 +49739,7 @@ class LayerExtension {
 }
 exports.default = LayerExtension;
 (0, _defineProperty2.default)(LayerExtension, "defaultProps", {});
+(0, _defineProperty2.default)(LayerExtension, "extensionName", 'LayerExtension');
 },{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","../utils/deep-equal":"node_modules/@deck.gl/core/dist/esm/utils/deep-equal.js"}],"node_modules/@deck.gl/core/dist/esm/transitions/fly-to-interpolator.js":[function(require,module,exports) {
 "use strict";
 
@@ -49713,7 +49752,11 @@ var _transitionInterpolator = _interopRequireDefault(require("./transition-inter
 var _core = require("@math.gl/core");
 var _webMercator = require("@math.gl/web-mercator");
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-const LINEARLY_INTERPOLATED_PROPS = ['bearing', 'pitch'];
+const LINEARLY_INTERPOLATED_PROPS = {
+  bearing: 0,
+  pitch: 0,
+  position: [0, 0, 0]
+};
 const DEFAULT_OPTS = {
   speed: 1.2,
   curve: 1.414
@@ -49721,8 +49764,8 @@ const DEFAULT_OPTS = {
 class FlyToInterpolator extends _transitionInterpolator.default {
   constructor(opts = {}) {
     super({
-      compare: ['longitude', 'latitude', 'zoom', 'bearing', 'pitch'],
-      extract: ['width', 'height', 'longitude', 'latitude', 'zoom', 'bearing', 'pitch'],
+      compare: ['longitude', 'latitude', 'zoom', 'bearing', 'pitch', 'position'],
+      extract: ['width', 'height', 'longitude', 'latitude', 'zoom', 'bearing', 'pitch', 'position'],
       required: ['width', 'height', 'latitude', 'longitude', 'zoom']
     });
     (0, _defineProperty2.default)(this, "opts", void 0);
@@ -49733,8 +49776,8 @@ class FlyToInterpolator extends _transitionInterpolator.default {
   }
   interpolateProps(startProps, endProps, t) {
     const viewport = (0, _webMercator.flyToViewport)(startProps, endProps, t, this.opts);
-    for (const key of LINEARLY_INTERPOLATED_PROPS) {
-      viewport[key] = (0, _core.lerp)(startProps[key] || 0, endProps[key] || 0, t);
+    for (const key in LINEARLY_INTERPOLATED_PROPS) {
+      viewport[key] = (0, _core.lerp)(startProps[key] || LINEARLY_INTERPOLATED_PROPS[key], endProps[key] || LINEARLY_INTERPOLATED_PROPS[key], t);
     }
     return viewport;
   }
@@ -54145,7 +54188,7 @@ class PathLayer extends _core.Layer {
         }
       }
     } else {
-      this._disablePickingIndex(objectIndex);
+      super.disablePickingIndex(objectIndex);
     }
   }
   draw({
@@ -55086,7 +55129,7 @@ function getSurfaceIndices(polygon, positionSize, preproject, full3d) {
       if (!preproject) {
         positions = positions.slice();
       }
-      permutePositions(positions, 1, 2, 0);
+      permutePositions(positions, 2, 0, 1);
     }
   }
   return (0, _earcut.default)(positions, holeIndices, positionSize);
@@ -55537,7 +55580,7 @@ class SolidPolygonLayer extends _core.Layer {
         }
       }
     } else {
-      this._disablePickingIndex(objectIndex);
+      super.disablePickingIndex(objectIndex);
     }
   }
   draw({
@@ -58241,20 +58284,5725 @@ var _solidPolygonLayer = _interopRequireDefault(require("./solid-polygon-layer/s
 var _multiIconLayer = _interopRequireDefault(require("./text-layer/multi-icon-layer/multi-icon-layer"));
 var _textBackgroundLayer = _interopRequireDefault(require("./text-layer/text-background-layer/text-background-layer"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./arc-layer/arc-layer":"node_modules/@deck.gl/layers/dist/esm/arc-layer/arc-layer.js","./bitmap-layer/bitmap-layer":"node_modules/@deck.gl/layers/dist/esm/bitmap-layer/bitmap-layer.js","./icon-layer/icon-layer":"node_modules/@deck.gl/layers/dist/esm/icon-layer/icon-layer.js","./line-layer/line-layer":"node_modules/@deck.gl/layers/dist/esm/line-layer/line-layer.js","./point-cloud-layer/point-cloud-layer":"node_modules/@deck.gl/layers/dist/esm/point-cloud-layer/point-cloud-layer.js","./scatterplot-layer/scatterplot-layer":"node_modules/@deck.gl/layers/dist/esm/scatterplot-layer/scatterplot-layer.js","./column-layer/column-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/column-layer.js","./column-layer/grid-cell-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/grid-cell-layer.js","./path-layer/path-layer":"node_modules/@deck.gl/layers/dist/esm/path-layer/path-layer.js","./polygon-layer/polygon-layer":"node_modules/@deck.gl/layers/dist/esm/polygon-layer/polygon-layer.js","./geojson-layer/geojson-layer":"node_modules/@deck.gl/layers/dist/esm/geojson-layer/geojson-layer.js","./text-layer/text-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-layer.js","./solid-polygon-layer/solid-polygon-layer":"node_modules/@deck.gl/layers/dist/esm/solid-polygon-layer/solid-polygon-layer.js","./text-layer/multi-icon-layer/multi-icon-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/multi-icon-layer/multi-icon-layer.js","./text-layer/text-background-layer/text-background-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-background-layer/text-background-layer.js"}],"src/deckLayers.js":[function(require,module,exports) {
+},{"./arc-layer/arc-layer":"node_modules/@deck.gl/layers/dist/esm/arc-layer/arc-layer.js","./bitmap-layer/bitmap-layer":"node_modules/@deck.gl/layers/dist/esm/bitmap-layer/bitmap-layer.js","./icon-layer/icon-layer":"node_modules/@deck.gl/layers/dist/esm/icon-layer/icon-layer.js","./line-layer/line-layer":"node_modules/@deck.gl/layers/dist/esm/line-layer/line-layer.js","./point-cloud-layer/point-cloud-layer":"node_modules/@deck.gl/layers/dist/esm/point-cloud-layer/point-cloud-layer.js","./scatterplot-layer/scatterplot-layer":"node_modules/@deck.gl/layers/dist/esm/scatterplot-layer/scatterplot-layer.js","./column-layer/column-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/column-layer.js","./column-layer/grid-cell-layer":"node_modules/@deck.gl/layers/dist/esm/column-layer/grid-cell-layer.js","./path-layer/path-layer":"node_modules/@deck.gl/layers/dist/esm/path-layer/path-layer.js","./polygon-layer/polygon-layer":"node_modules/@deck.gl/layers/dist/esm/polygon-layer/polygon-layer.js","./geojson-layer/geojson-layer":"node_modules/@deck.gl/layers/dist/esm/geojson-layer/geojson-layer.js","./text-layer/text-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-layer.js","./solid-polygon-layer/solid-polygon-layer":"node_modules/@deck.gl/layers/dist/esm/solid-polygon-layer/solid-polygon-layer.js","./text-layer/multi-icon-layer/multi-icon-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/multi-icon-layer/multi-icon-layer.js","./text-layer/text-background-layer/text-background-layer":"node_modules/@deck.gl/layers/dist/esm/text-layer/text-background-layer/text-background-layer.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.layers = exports.dataSource = void 0;
+exports.AGGREGATION_OPERATION = void 0;
+exports.getMax = getMax;
+exports.getMean = getMean;
+exports.getMin = getMin;
+exports.getSum = getSum;
+exports.getValueFunc = getValueFunc;
+exports.wrapGetValueFunc = wrapGetValueFunc;
+const AGGREGATION_OPERATION = {
+  SUM: 1,
+  MEAN: 2,
+  MIN: 3,
+  MAX: 4
+};
+exports.AGGREGATION_OPERATION = AGGREGATION_OPERATION;
+function sumReducer(accu, cur) {
+  return accu + cur;
+}
+function maxReducer(accu, cur) {
+  return cur > accu ? cur : accu;
+}
+function minReducer(accu, cur) {
+  return cur < accu ? cur : accu;
+}
+function getMean(pts, accessor) {
+  if (Number.isFinite(accessor)) {
+    return pts.length ? accessor : null;
+  }
+  const filtered = pts.map(accessor).filter(Number.isFinite);
+  return filtered.length ? filtered.reduce(sumReducer, 0) / filtered.length : null;
+}
+function getSum(pts, accessor) {
+  if (Number.isFinite(accessor)) {
+    return pts.length ? pts.length * accessor : null;
+  }
+  const filtered = pts.map(accessor).filter(Number.isFinite);
+  return filtered.length ? filtered.reduce(sumReducer, 0) : null;
+}
+function getMax(pts, accessor) {
+  if (Number.isFinite(accessor)) {
+    return pts.length ? accessor : null;
+  }
+  const filtered = pts.map(accessor).filter(Number.isFinite);
+  return filtered.length ? filtered.reduce(maxReducer, -Infinity) : null;
+}
+function getMin(pts, accessor) {
+  if (Number.isFinite(accessor)) {
+    return pts.length ? accessor : null;
+  }
+  const filtered = pts.map(accessor).filter(Number.isFinite);
+  return filtered.length ? filtered.reduce(minReducer, Infinity) : null;
+}
+function getValueFunc(aggregation, accessor, context) {
+  const op = AGGREGATION_OPERATION[aggregation] || AGGREGATION_OPERATION.SUM;
+  accessor = wrapAccessor(accessor, context);
+  switch (op) {
+    case AGGREGATION_OPERATION.MIN:
+      return pts => getMin(pts, accessor);
+    case AGGREGATION_OPERATION.SUM:
+      return pts => getSum(pts, accessor);
+    case AGGREGATION_OPERATION.MEAN:
+      return pts => getMean(pts, accessor);
+    case AGGREGATION_OPERATION.MAX:
+      return pts => getMax(pts, accessor);
+    default:
+      return null;
+  }
+}
+function wrapAccessor(accessor, context = {}) {
+  if (Number.isFinite(accessor)) {
+    return accessor;
+  }
+  return pt => {
+    context.index = pt.index;
+    return accessor(pt.source, context);
+  };
+}
+function wrapGetValueFunc(getValue, context = {}) {
+  return pts => {
+    context.indices = pts.map(pt => pt.index);
+    return getValue(pts.map(pt => pt.source), context);
+  };
+}
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator-constants.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.WEIGHT_SIZE = exports.PIXEL_SIZE = exports.MIN_BLEND_EQUATION = exports.MAX_MIN_TEXTURE_OPTS = exports.MAX_MIN_BLEND_EQUATION = exports.MAX_BLEND_EQUATION = exports.MAX_32_BIT_FLOAT = exports.EQUATION_MAP = exports.ELEMENTCOUNT = exports.DEFAULT_WEIGHT_PARAMS = exports.DEFAULT_RUN_PARAMS = void 0;
+var _aggregationOperationUtils = require("../aggregation-operation-utils");
+const DEFAULT_RUN_PARAMS = {
+  projectPoints: false,
+  viewport: null,
+  createBufferObjects: true,
+  moduleSettings: {}
+};
+exports.DEFAULT_RUN_PARAMS = DEFAULT_RUN_PARAMS;
+const MAX_32_BIT_FLOAT = 3.402823466e38;
+exports.MAX_32_BIT_FLOAT = MAX_32_BIT_FLOAT;
+const MIN_BLEND_EQUATION = [32775, 32774];
+exports.MIN_BLEND_EQUATION = MIN_BLEND_EQUATION;
+const MAX_BLEND_EQUATION = [32776, 32774];
+exports.MAX_BLEND_EQUATION = MAX_BLEND_EQUATION;
+const MAX_MIN_BLEND_EQUATION = [32776, 32775];
+exports.MAX_MIN_BLEND_EQUATION = MAX_MIN_BLEND_EQUATION;
+const EQUATION_MAP = {
+  [_aggregationOperationUtils.AGGREGATION_OPERATION.SUM]: 32774,
+  [_aggregationOperationUtils.AGGREGATION_OPERATION.MEAN]: 32774,
+  [_aggregationOperationUtils.AGGREGATION_OPERATION.MIN]: MIN_BLEND_EQUATION,
+  [_aggregationOperationUtils.AGGREGATION_OPERATION.MAX]: MAX_BLEND_EQUATION
+};
+exports.EQUATION_MAP = EQUATION_MAP;
+const ELEMENTCOUNT = 4;
+exports.ELEMENTCOUNT = ELEMENTCOUNT;
+const DEFAULT_WEIGHT_PARAMS = {
+  size: 1,
+  operation: _aggregationOperationUtils.AGGREGATION_OPERATION.SUM,
+  needMin: false,
+  needMax: false,
+  combineMaxMin: false
+};
+exports.DEFAULT_WEIGHT_PARAMS = DEFAULT_WEIGHT_PARAMS;
+const PIXEL_SIZE = 4;
+exports.PIXEL_SIZE = PIXEL_SIZE;
+const WEIGHT_SIZE = 3;
+exports.WEIGHT_SIZE = WEIGHT_SIZE;
+const MAX_MIN_TEXTURE_OPTS = {
+  format: 34836,
+  type: 5126,
+  border: 0,
+  mipmaps: false,
+  parameters: {
+    [10240]: 9728,
+    [10241]: 9728
+  },
+  dataFormat: 6408,
+  width: 1,
+  height: 1
+};
+exports.MAX_MIN_TEXTURE_OPTS = MAX_MIN_TEXTURE_OPTS;
+},{"../aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-to-grid-vs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME gpu-aggregation-to-grid-vs\n\nattribute vec3 positions;\nattribute vec3 positions64Low;\nattribute vec3 weights;\nuniform vec2 cellSize;\nuniform vec2 gridSize;\nuniform bool projectPoints;\nuniform vec2 translation;\nuniform vec3 scaling;\n\nvarying vec3 vWeights;\n\nvec2 project_to_pixel(vec4 pos) {\n  vec4 result;\n  pos.xy = pos.xy/pos.w;\n  result = pos + vec4(translation, 0., 0.);\n  result.xy = scaling.z > 0. ? result.xy * scaling.xy : result.xy;\n  return result.xy;\n}\n\nvoid main(void) {\n\n  vWeights = weights;\n\n  vec4 windowPos = vec4(positions, 1.);\n  if (projectPoints) {\n    windowPos = project_position_to_clipspace(positions, positions64Low, vec3(0));\n  }\n\n  vec2 pos = project_to_pixel(windowPos);\n\n  vec2 pixelXY64[2];\n  pixelXY64[0] = vec2(pos.x, 0.);\n  pixelXY64[1] = vec2(pos.y, 0.);\n  vec2 gridXY64[2];\n  gridXY64[0] = div_fp64(pixelXY64[0], vec2(cellSize.x, 0));\n  gridXY64[1] = div_fp64(pixelXY64[1], vec2(cellSize.y, 0));\n  float x = floor(gridXY64[0].x);\n  float y = floor(gridXY64[1].x);\n  pos = vec2(x, y);\n  pos = (pos * (2., 2.) / (gridSize)) - (1., 1.);\n  vec2 offset = 1.0 / gridSize;\n  pos = pos + offset;\n\n  gl_Position = vec4(pos, 0.0, 1.0);\n  gl_PointSize = 1.0;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-to-grid-fs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME gpu-aggregation-to-grid-fs\n\nprecision highp float;\n\nvarying vec3 vWeights;\n\nvoid main(void) {\n  gl_FragColor = vec4(vWeights, 1.0);\n  DECKGL_FILTER_COLOR(gl_FragColor, geometry);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-all-vs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#version 300 es\n#define SHADER_NAME gpu-aggregation-all-vs-64\n\nin vec2 position;\nuniform ivec2 gridSize;\nout vec2 vTextureCoord;\n\nvoid main(void) {\n  vec2 pos = vec2(-1.0, -1.0);\n  vec2 offset = 1.0 / vec2(gridSize);\n  pos = pos + offset;\n\n  gl_Position = vec4(pos, 0.0, 1.0);\n\n  int yIndex = gl_InstanceID / gridSize[0];\n  int xIndex = gl_InstanceID - (yIndex * gridSize[0]);\n\n  vec2 yIndexFP64 = vec2(float(yIndex), 0.);\n  vec2 xIndexFP64 = vec2(float(xIndex), 0.);\n  vec2 gridSizeYFP64 = vec2(gridSize[1], 0.);\n  vec2 gridSizeXFP64 = vec2(gridSize[0], 0.);\n\n  vec2 texCoordXFP64 = div_fp64(yIndexFP64, gridSizeYFP64);\n  vec2 texCoordYFP64 = div_fp64(xIndexFP64, gridSizeXFP64);\n\n  vTextureCoord = vec2(texCoordYFP64.x, texCoordXFP64.x);\n  gl_PointSize = 1.0;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-all-fs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#version 300 es\n#define SHADER_NAME gpu-aggregation-all-fs\n\nprecision highp float;\n\nin vec2 vTextureCoord;\nuniform sampler2D uSampler;\nuniform bool combineMaxMin;\nout vec4 fragColor;\nvoid main(void) {\n  vec4 textureColor = texture(uSampler, vec2(vTextureCoord.s, vTextureCoord.t));\n  if (textureColor.a == 0.) {\n    discard;\n  }\n  fragColor.rgb = textureColor.rgb;\n  fragColor.a = combineMaxMin ? textureColor.r : textureColor.a;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/transform-mean-vs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME gpu-aggregation-transform-mean-vs\nattribute vec4 aggregationValues;\nvarying vec4 meanValues;\n\nvoid main()\n{\n  bool isCellValid = bool(aggregationValues.w > 0.);\n  meanValues.xyz = isCellValid ? aggregationValues.xyz/aggregationValues.w : vec3(0, 0, 0);\n  meanValues.w = aggregationValues.w;\n  gl_PointSize = 1.0;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/resource-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getFloatArray = getFloatArray;
+exports.getFloatTexture = getFloatTexture;
+exports.getFramebuffer = getFramebuffer;
+var _core = require("@luma.gl/core");
+const DEFAULT_PARAMETERS = {
+  [10240]: 9728,
+  [10241]: 9728
+};
+function getFloatTexture(gl, opts = {}) {
+  const {
+    width = 1,
+    height = 1,
+    data = null,
+    unpackFlipY = true,
+    parameters = DEFAULT_PARAMETERS
+  } = opts;
+  const texture = new _core.Texture2D(gl, {
+    data,
+    format: (0, _core.isWebGL2)(gl) ? 34836 : 6408,
+    type: 5126,
+    border: 0,
+    mipmaps: false,
+    parameters,
+    dataFormat: 6408,
+    width,
+    height,
+    unpackFlipY
+  });
+  return texture;
+}
+function getFramebuffer(gl, opts) {
+  const {
+    id,
+    width = 1,
+    height = 1,
+    texture
+  } = opts;
+  const fb = new _core.Framebuffer(gl, {
+    id,
+    width,
+    height,
+    attachments: {
+      [36064]: texture
+    }
+  });
+  return fb;
+}
+function getFloatArray(array, size, fillValue = 0) {
+  if (!array || array.length < size) {
+    return new Float32Array(size).fill(fillValue);
+  }
+  return array;
+}
+},{"@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _core = require("@luma.gl/core");
+var _shadertools = require("@luma.gl/shadertools");
+var _core2 = require("@deck.gl/core");
+var _gpuGridAggregatorConstants = require("./gpu-grid-aggregator-constants");
+var _aggregationOperationUtils = require("../aggregation-operation-utils");
+var _aggregateToGridVs = _interopRequireDefault(require("./aggregate-to-grid-vs.glsl"));
+var _aggregateToGridFs = _interopRequireDefault(require("./aggregate-to-grid-fs.glsl"));
+var _aggregateAllVs = _interopRequireDefault(require("./aggregate-all-vs.glsl"));
+var _aggregateAllFs = _interopRequireDefault(require("./aggregate-all-fs.glsl"));
+var _transformMeanVs = _interopRequireDefault(require("./transform-mean-vs.glsl"));
+var _resourceUtils = require("./../resource-utils.js");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const BUFFER_NAMES = ['aggregationBuffer', 'maxMinBuffer', 'minBuffer', 'maxBuffer'];
+const ARRAY_BUFFER_MAP = {
+  maxData: 'maxBuffer',
+  minData: 'minBuffer',
+  maxMinData: 'maxMinBuffer'
+};
+const REQUIRED_FEATURES = [_core.FEATURES.WEBGL2, _core.FEATURES.COLOR_ATTACHMENT_RGBA32F, _core.FEATURES.BLEND_EQUATION_MINMAX, _core.FEATURES.FLOAT_BLEND, _core.FEATURES.TEXTURE_FLOAT];
+class GPUGridAggregator {
+  static getAggregationData({
+    aggregationData,
+    maxData,
+    minData,
+    maxMinData,
+    pixelIndex
+  }) {
+    const index = pixelIndex * _gpuGridAggregatorConstants.PIXEL_SIZE;
+    const results = {};
+    if (aggregationData) {
+      results.cellCount = aggregationData[index + 3];
+      results.cellWeight = aggregationData[index];
+    }
+    if (maxMinData) {
+      results.maxCellWieght = maxMinData[0];
+      results.minCellWeight = maxMinData[3];
+    } else {
+      if (maxData) {
+        results.maxCellWieght = maxData[0];
+        results.totalCount = maxData[3];
+      }
+      if (minData) {
+        results.minCellWeight = minData[0];
+        results.totalCount = maxData[3];
+      }
+    }
+    return results;
+  }
+  static getCellData({
+    countsData,
+    size = 1
+  }) {
+    const numCells = countsData.length / 4;
+    const cellWeights = new Float32Array(numCells * size);
+    const cellCounts = new Uint32Array(numCells);
+    for (let i = 0; i < numCells; i++) {
+      for (let sizeIndex = 0; sizeIndex < size; sizeIndex++) {
+        cellWeights[i * size + sizeIndex] = countsData[i * 4 + sizeIndex];
+      }
+      cellCounts[i] = countsData[i * 4 + 3];
+    }
+    return {
+      cellCounts,
+      cellWeights
+    };
+  }
+  static isSupported(gl) {
+    return (0, _core.hasFeatures)(gl, REQUIRED_FEATURES);
+  }
+  constructor(gl, opts = {}) {
+    this.id = opts.id || 'gpu-grid-aggregator';
+    this.gl = gl;
+    this.state = {
+      weightAttributes: {},
+      textures: {},
+      meanTextures: {},
+      buffers: {},
+      framebuffers: {},
+      maxMinFramebuffers: {},
+      minFramebuffers: {},
+      maxFramebuffers: {},
+      equations: {},
+      resources: {},
+      results: {}
+    };
+    this._hasGPUSupport = (0, _core.isWebGL2)(gl) && (0, _core.hasFeatures)(this.gl, _core.FEATURES.BLEND_EQUATION_MINMAX, _core.FEATURES.COLOR_ATTACHMENT_RGBA32F, _core.FEATURES.TEXTURE_FLOAT);
+    if (this._hasGPUSupport) {
+      this._setupModels();
+    }
+  }
+  delete() {
+    const {
+      gridAggregationModel,
+      allAggregationModel,
+      meanTransform
+    } = this;
+    const {
+      textures,
+      framebuffers,
+      maxMinFramebuffers,
+      minFramebuffers,
+      maxFramebuffers,
+      meanTextures,
+      resources
+    } = this.state;
+    gridAggregationModel === null || gridAggregationModel === void 0 ? void 0 : gridAggregationModel.delete();
+    allAggregationModel === null || allAggregationModel === void 0 ? void 0 : allAggregationModel.delete();
+    meanTransform === null || meanTransform === void 0 ? void 0 : meanTransform.delete();
+    deleteResources([framebuffers, textures, maxMinFramebuffers, minFramebuffers, maxFramebuffers, meanTextures, resources]);
+  }
+  run(opts = {}) {
+    this.setState({
+      results: {}
+    });
+    const aggregationParams = this._normalizeAggregationParams(opts);
+    if (!this._hasGPUSupport) {
+      _core2.log.log(1, 'GPUGridAggregator: not supported')();
+    }
+    return this._runAggregation(aggregationParams);
+  }
+  getData(weightId) {
+    const data = {};
+    const results = this.state.results;
+    if (!results[weightId].aggregationData) {
+      results[weightId].aggregationData = results[weightId].aggregationBuffer.getData();
+    }
+    data.aggregationData = results[weightId].aggregationData;
+    for (const arrayName in ARRAY_BUFFER_MAP) {
+      const bufferName = ARRAY_BUFFER_MAP[arrayName];
+      if (results[weightId][arrayName] || results[weightId][bufferName]) {
+        results[weightId][arrayName] = results[weightId][arrayName] || results[weightId][bufferName].getData();
+        data[arrayName] = results[weightId][arrayName];
+      }
+    }
+    return data;
+  }
+  updateShaders(shaderOptions = {}) {
+    this.setState({
+      shaderOptions,
+      modelDirty: true
+    });
+  }
+  _normalizeAggregationParams(opts) {
+    const aggregationParams = {
+      ..._gpuGridAggregatorConstants.DEFAULT_RUN_PARAMS,
+      ...opts
+    };
+    const {
+      weights
+    } = aggregationParams;
+    if (weights) {
+      aggregationParams.weights = normalizeWeightParams(weights);
+    }
+    return aggregationParams;
+  }
+  setState(updateObject) {
+    Object.assign(this.state, updateObject);
+  }
+  _getAggregateData(opts) {
+    const results = {};
+    const {
+      textures,
+      framebuffers,
+      maxMinFramebuffers,
+      minFramebuffers,
+      maxFramebuffers,
+      resources
+    } = this.state;
+    const {
+      weights
+    } = opts;
+    for (const id in weights) {
+      results[id] = {};
+      const {
+        needMin,
+        needMax,
+        combineMaxMin
+      } = weights[id];
+      results[id].aggregationTexture = textures[id];
+      results[id].aggregationBuffer = (0, _core.readPixelsToBuffer)(framebuffers[id], {
+        target: weights[id].aggregationBuffer,
+        sourceType: 5126
+      });
+      if (needMin && needMax && combineMaxMin) {
+        results[id].maxMinBuffer = (0, _core.readPixelsToBuffer)(maxMinFramebuffers[id], {
+          target: weights[id].maxMinBuffer,
+          sourceType: 5126
+        });
+        results[id].maxMinTexture = resources["".concat(id, "-maxMinTexture")];
+      } else {
+        if (needMin) {
+          results[id].minBuffer = (0, _core.readPixelsToBuffer)(minFramebuffers[id], {
+            target: weights[id].minBuffer,
+            sourceType: 5126
+          });
+          results[id].minTexture = resources["".concat(id, "-minTexture")];
+        }
+        if (needMax) {
+          results[id].maxBuffer = (0, _core.readPixelsToBuffer)(maxFramebuffers[id], {
+            target: weights[id].maxBuffer,
+            sourceType: 5126
+          });
+          results[id].maxTexture = resources["".concat(id, "-maxTexture")];
+        }
+      }
+    }
+    this._trackGPUResultBuffers(results, weights);
+    return results;
+  }
+  _renderAggregateData(opts) {
+    const {
+      cellSize,
+      projectPoints,
+      attributes,
+      moduleSettings,
+      numCol,
+      numRow,
+      weights,
+      translation,
+      scaling
+    } = opts;
+    const {
+      maxMinFramebuffers,
+      minFramebuffers,
+      maxFramebuffers
+    } = this.state;
+    const gridSize = [numCol, numRow];
+    const parameters = {
+      blend: true,
+      depthTest: false,
+      blendFunc: [1, 1]
+    };
+    const uniforms = {
+      cellSize,
+      gridSize,
+      projectPoints,
+      translation,
+      scaling
+    };
+    for (const id in weights) {
+      const {
+        needMin,
+        needMax
+      } = weights[id];
+      const combineMaxMin = needMin && needMax && weights[id].combineMaxMin;
+      this._renderToWeightsTexture({
+        id,
+        parameters,
+        moduleSettings,
+        uniforms,
+        gridSize,
+        attributes,
+        weights
+      });
+      if (combineMaxMin) {
+        this._renderToMaxMinTexture({
+          id,
+          parameters: {
+            ...parameters,
+            blendEquation: _gpuGridAggregatorConstants.MAX_MIN_BLEND_EQUATION
+          },
+          gridSize,
+          minOrMaxFb: maxMinFramebuffers[id],
+          clearParams: {
+            clearColor: [0, 0, 0, _gpuGridAggregatorConstants.MAX_32_BIT_FLOAT]
+          },
+          combineMaxMin
+        });
+      } else {
+        if (needMin) {
+          this._renderToMaxMinTexture({
+            id,
+            parameters: {
+              ...parameters,
+              blendEquation: _gpuGridAggregatorConstants.MIN_BLEND_EQUATION
+            },
+            gridSize,
+            minOrMaxFb: minFramebuffers[id],
+            clearParams: {
+              clearColor: [_gpuGridAggregatorConstants.MAX_32_BIT_FLOAT, _gpuGridAggregatorConstants.MAX_32_BIT_FLOAT, _gpuGridAggregatorConstants.MAX_32_BIT_FLOAT, 0]
+            },
+            combineMaxMin
+          });
+        }
+        if (needMax) {
+          this._renderToMaxMinTexture({
+            id,
+            parameters: {
+              ...parameters,
+              blendEquation: _gpuGridAggregatorConstants.MAX_BLEND_EQUATION
+            },
+            gridSize,
+            minOrMaxFb: maxFramebuffers[id],
+            clearParams: {
+              clearColor: [0, 0, 0, 0]
+            },
+            combineMaxMin
+          });
+        }
+      }
+    }
+  }
+  _renderToMaxMinTexture(opts) {
+    const {
+      id,
+      parameters,
+      gridSize,
+      minOrMaxFb,
+      combineMaxMin,
+      clearParams = {}
+    } = opts;
+    const {
+      framebuffers
+    } = this.state;
+    const {
+      gl,
+      allAggregationModel
+    } = this;
+    (0, _core.withParameters)(gl, {
+      ...clearParams,
+      framebuffer: minOrMaxFb,
+      viewport: [0, 0, gridSize[0], gridSize[1]]
+    }, () => {
+      gl.clear(16384);
+      allAggregationModel.draw({
+        parameters,
+        uniforms: {
+          uSampler: framebuffers[id].texture,
+          gridSize,
+          combineMaxMin
+        }
+      });
+    });
+  }
+  _renderToWeightsTexture(opts) {
+    const {
+      id,
+      parameters,
+      moduleSettings,
+      uniforms,
+      gridSize,
+      weights
+    } = opts;
+    const {
+      framebuffers,
+      equations,
+      weightAttributes
+    } = this.state;
+    const {
+      gl,
+      gridAggregationModel
+    } = this;
+    const {
+      operation
+    } = weights[id];
+    const clearColor = operation === _aggregationOperationUtils.AGGREGATION_OPERATION.MIN ? [_gpuGridAggregatorConstants.MAX_32_BIT_FLOAT, _gpuGridAggregatorConstants.MAX_32_BIT_FLOAT, _gpuGridAggregatorConstants.MAX_32_BIT_FLOAT, 0] : [0, 0, 0, 0];
+    (0, _core.withParameters)(gl, {
+      framebuffer: framebuffers[id],
+      viewport: [0, 0, gridSize[0], gridSize[1]],
+      clearColor
+    }, () => {
+      gl.clear(16384);
+      const attributes = {
+        weights: weightAttributes[id]
+      };
+      gridAggregationModel.draw({
+        parameters: {
+          ...parameters,
+          blendEquation: equations[id]
+        },
+        moduleSettings,
+        uniforms,
+        attributes
+      });
+    });
+    if (operation === _aggregationOperationUtils.AGGREGATION_OPERATION.MEAN) {
+      const {
+        meanTextures,
+        textures
+      } = this.state;
+      const transformOptions = {
+        _sourceTextures: {
+          aggregationValues: meanTextures[id]
+        },
+        _targetTexture: textures[id],
+        elementCount: textures[id].width * textures[id].height
+      };
+      if (this.meanTransform) {
+        this.meanTransform.update(transformOptions);
+      } else {
+        this.meanTransform = getMeanTransform(gl, transformOptions);
+      }
+      this.meanTransform.run({
+        parameters: {
+          blend: false,
+          depthTest: false
+        }
+      });
+      framebuffers[id].attach({
+        [36064]: textures[id]
+      });
+    }
+  }
+  _runAggregation(opts) {
+    this._updateModels(opts);
+    this._setupFramebuffers(opts);
+    this._renderAggregateData(opts);
+    const results = this._getAggregateData(opts);
+    this.setState({
+      results
+    });
+    return results;
+  }
+  _setupFramebuffers(opts) {
+    const {
+      textures,
+      framebuffers,
+      maxMinFramebuffers,
+      minFramebuffers,
+      maxFramebuffers,
+      meanTextures,
+      equations
+    } = this.state;
+    const {
+      weights
+    } = opts;
+    const {
+      numCol,
+      numRow
+    } = opts;
+    const framebufferSize = {
+      width: numCol,
+      height: numRow
+    };
+    for (const id in weights) {
+      const {
+        needMin,
+        needMax,
+        combineMaxMin,
+        operation
+      } = weights[id];
+      textures[id] = weights[id].aggregationTexture || textures[id] || (0, _resourceUtils.getFloatTexture)(this.gl, {
+        id: "".concat(id, "-texture"),
+        width: numCol,
+        height: numRow
+      });
+      textures[id].resize(framebufferSize);
+      let texture = textures[id];
+      if (operation === _aggregationOperationUtils.AGGREGATION_OPERATION.MEAN) {
+        meanTextures[id] = meanTextures[id] || (0, _resourceUtils.getFloatTexture)(this.gl, {
+          id: "".concat(id, "-mean-texture"),
+          width: numCol,
+          height: numRow
+        });
+        meanTextures[id].resize(framebufferSize);
+        texture = meanTextures[id];
+      }
+      if (framebuffers[id]) {
+        framebuffers[id].attach({
+          [36064]: texture
+        });
+      } else {
+        framebuffers[id] = (0, _resourceUtils.getFramebuffer)(this.gl, {
+          id: "".concat(id, "-fb"),
+          width: numCol,
+          height: numRow,
+          texture
+        });
+      }
+      framebuffers[id].resize(framebufferSize);
+      equations[id] = _gpuGridAggregatorConstants.EQUATION_MAP[operation] || _gpuGridAggregatorConstants.EQUATION_MAP.SUM;
+      if (needMin || needMax) {
+        if (needMin && needMax && combineMaxMin) {
+          if (!maxMinFramebuffers[id]) {
+            texture = weights[id].maxMinTexture || this._getMinMaxTexture("".concat(id, "-maxMinTexture"));
+            maxMinFramebuffers[id] = (0, _resourceUtils.getFramebuffer)(this.gl, {
+              id: "".concat(id, "-maxMinFb"),
+              texture
+            });
+          }
+        } else {
+          if (needMin) {
+            if (!minFramebuffers[id]) {
+              texture = weights[id].minTexture || this._getMinMaxTexture("".concat(id, "-minTexture"));
+              minFramebuffers[id] = (0, _resourceUtils.getFramebuffer)(this.gl, {
+                id: "".concat(id, "-minFb"),
+                texture
+              });
+            }
+          }
+          if (needMax) {
+            if (!maxFramebuffers[id]) {
+              texture = weights[id].maxTexture || this._getMinMaxTexture("".concat(id, "-maxTexture"));
+              maxFramebuffers[id] = (0, _resourceUtils.getFramebuffer)(this.gl, {
+                id: "".concat(id, "-maxFb"),
+                texture
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  _getMinMaxTexture(name) {
+    const {
+      resources
+    } = this.state;
+    if (!resources[name]) {
+      resources[name] = (0, _resourceUtils.getFloatTexture)(this.gl, {
+        id: "resourceName"
+      });
+    }
+    return resources[name];
+  }
+  _setupModels({
+    numCol = 0,
+    numRow = 0
+  } = {}) {
+    var _this$gridAggregation;
+    const {
+      gl
+    } = this;
+    const {
+      shaderOptions
+    } = this.state;
+    (_this$gridAggregation = this.gridAggregationModel) === null || _this$gridAggregation === void 0 ? void 0 : _this$gridAggregation.delete();
+    this.gridAggregationModel = getAggregationModel(gl, shaderOptions);
+    if (!this.allAggregationModel) {
+      const instanceCount = numCol * numRow;
+      this.allAggregationModel = getAllAggregationModel(gl, instanceCount);
+    }
+  }
+  _setupWeightAttributes(opts) {
+    const {
+      weightAttributes
+    } = this.state;
+    const {
+      weights
+    } = opts;
+    for (const id in weights) {
+      weightAttributes[id] = opts.attributes[id];
+    }
+  }
+  _trackGPUResultBuffers(results, weights) {
+    const {
+      resources
+    } = this.state;
+    for (const id in results) {
+      if (results[id]) {
+        for (const bufferName of BUFFER_NAMES) {
+          if (results[id][bufferName] && weights[id][bufferName] !== results[id][bufferName]) {
+            const name = "gpu-result-".concat(id, "-").concat(bufferName);
+            if (resources[name]) {
+              resources[name].delete();
+            }
+            resources[name] = results[id][bufferName];
+          }
+        }
+      }
+    }
+  }
+  _updateModels(opts) {
+    const {
+      vertexCount,
+      attributes,
+      numCol,
+      numRow
+    } = opts;
+    const {
+      modelDirty
+    } = this.state;
+    if (modelDirty) {
+      this._setupModels(opts);
+      this.setState({
+        modelDirty: false
+      });
+    }
+    this._setupWeightAttributes(opts);
+    this.gridAggregationModel.setVertexCount(vertexCount);
+    this.gridAggregationModel.setAttributes(attributes);
+    this.allAggregationModel.setInstanceCount(numCol * numRow);
+  }
+}
+exports.default = GPUGridAggregator;
+function normalizeWeightParams(weights) {
+  const result = {};
+  for (const id in weights) {
+    result[id] = {
+      ..._gpuGridAggregatorConstants.DEFAULT_WEIGHT_PARAMS,
+      ...weights[id]
+    };
+  }
+  return result;
+}
+function deleteResources(resources) {
+  resources = Array.isArray(resources) ? resources : [resources];
+  resources.forEach(obj => {
+    for (const name in obj) {
+      obj[name].delete();
+    }
+  });
+}
+function getAggregationModel(gl, shaderOptions) {
+  const shaders = (0, _core2._mergeShaders)({
+    vs: _aggregateToGridVs.default,
+    fs: _aggregateToGridFs.default,
+    modules: [_shadertools.fp64arithmetic, _core2.project32]
+  }, shaderOptions);
+  return new _core.Model(gl, {
+    id: 'Gird-Aggregation-Model',
+    vertexCount: 1,
+    drawMode: 0,
+    ...shaders
+  });
+}
+function getAllAggregationModel(gl, instanceCount) {
+  return new _core.Model(gl, {
+    id: 'All-Aggregation-Model',
+    vs: _aggregateAllVs.default,
+    fs: _aggregateAllFs.default,
+    modules: [_shadertools.fp64arithmetic],
+    vertexCount: 1,
+    drawMode: 0,
+    isInstanced: true,
+    instanceCount,
+    attributes: {
+      position: [0, 0]
+    }
+  });
+}
+function getMeanTransform(gl, opts) {
+  return new _core.Transform(gl, {
+    vs: _transformMeanVs.default,
+    _targetTextureVarying: 'meanValues',
+    ...opts
+  });
+}
+},{"@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@luma.gl/shadertools":"node_modules/@luma.gl/shadertools/dist/esm/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","./gpu-grid-aggregator-constants":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator-constants.js","../aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js","./aggregate-to-grid-vs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-to-grid-vs.glsl.js","./aggregate-to-grid-fs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-to-grid-fs.glsl.js","./aggregate-all-vs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-all-vs.glsl.js","./aggregate-all-fs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/aggregate-all-fs.glsl.js","./transform-mean-vs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/transform-mean-vs.glsl.js","./../resource-utils.js":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/resource-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.colorRangeToFlatArray = colorRangeToFlatArray;
+exports.defaultColorRange = void 0;
+const defaultColorRange = [[255, 255, 178], [254, 217, 118], [254, 178, 76], [253, 141, 60], [240, 59, 32], [189, 0, 38]];
+exports.defaultColorRange = defaultColorRange;
+function colorRangeToFlatArray(colorRange, normalize = false, ArrayType = Float32Array) {
+  let flatArray;
+  if (Number.isFinite(colorRange[0])) {
+    flatArray = new ArrayType(colorRange);
+  } else {
+    flatArray = new ArrayType(colorRange.length * 4);
+    let index = 0;
+    for (let i = 0; i < colorRange.length; i++) {
+      const color = colorRange[i];
+      flatArray[index++] = color[0];
+      flatArray[index++] = color[1];
+      flatArray[index++] = color[2];
+      flatArray[index++] = Number.isFinite(color[3]) ? color[3] : 255;
+    }
+  }
+  if (normalize) {
+    for (let i = 0; i < flatArray.length; i++) {
+      flatArray[i] /= 255;
+    }
+  }
+  return flatArray;
+}
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-layer-vertex.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME screen-grid-layer-vertex-shader\n#define RANGE_COUNT 6\n\nattribute vec3 positions;\nattribute vec3 instancePositions;\nattribute vec4 instanceCounts;\nattribute vec3 instancePickingColors;\n\nuniform float opacity;\nuniform vec3 cellScale;\nuniform vec4 minColor;\nuniform vec4 maxColor;\nuniform vec4 colorRange[RANGE_COUNT];\nuniform vec2 colorDomain;\nuniform bool shouldUseMinMax;\nuniform sampler2D maxTexture;\n\nvarying vec4 vColor;\nvarying float vSampleCount;\n\nvec4 quantizeScale(vec2 domain, vec4 range[RANGE_COUNT], float value) {\n  vec4 outColor = vec4(0., 0., 0., 0.);\n  if (value >= domain.x && value <= domain.y) {\n    float domainRange = domain.y - domain.x;\n    if (domainRange <= 0.) {\n      outColor = colorRange[0];\n    } else {\n      float rangeCount = float(RANGE_COUNT);\n      float rangeStep = domainRange / rangeCount;\n      float idx = floor((value - domain.x) / rangeStep);\n      idx = clamp(idx, 0., rangeCount - 1.);\n      int intIdx = int(idx);\n      outColor = colorRange[intIdx];\n    }\n  }\n  outColor = outColor / 255.;\n  return outColor;\n}\n\nvoid main(void) {\n  vSampleCount = instanceCounts.a;\n\n  float weight = instanceCounts.r;\n  float maxWeight = texture2D(maxTexture, vec2(0.5)).r;\n\n  float step = weight / maxWeight;\n  vec4 minMaxColor = mix(minColor, maxColor, step) / 255.;\n\n  vec2 domain = colorDomain;\n  float domainMaxValid = float(colorDomain.y != 0.);\n  domain.y = mix(maxWeight, colorDomain.y, domainMaxValid);\n  vec4 rangeColor = quantizeScale(domain, colorRange, weight);\n\n  float rangeMinMax = float(shouldUseMinMax);\n  vec4 color = mix(rangeColor, minMaxColor, rangeMinMax);\n  vColor = vec4(color.rgb, color.a * opacity);\n  picking_setPickingColor(instancePickingColors);\n\n  gl_Position = vec4(instancePositions + positions * cellScale, 1.);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-layer-fragment.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME screen-grid-layer-fragment-shader\n\nprecision highp float;\n\nvarying vec4 vColor;\nvarying float vSampleCount;\n\nvoid main(void) {\n  if (vSampleCount <= 0.0) {\n    discard;\n  }\n  gl_FragColor = vColor;\n\n  DECKGL_FILTER_COLOR(gl_FragColor, geometry);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-cell-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@luma.gl/core");
+var _core2 = require("@deck.gl/core");
+var _colorUtils = require("../utils/color-utils");
+var _screenGridLayerVertex = _interopRequireDefault(require("./screen-grid-layer-vertex.glsl"));
+var _screenGridLayerFragment = _interopRequireDefault(require("./screen-grid-layer-fragment.glsl"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const DEFAULT_MINCOLOR = [0, 0, 0, 0];
+const DEFAULT_MAXCOLOR = [0, 255, 0, 255];
+const COLOR_PROPS = ['minColor', 'maxColor', 'colorRange', 'colorDomain'];
+const defaultProps = {
+  cellSizePixels: {
+    value: 100,
+    min: 1
+  },
+  cellMarginPixels: {
+    value: 2,
+    min: 0,
+    max: 5
+  },
+  colorDomain: null,
+  colorRange: _colorUtils.defaultColorRange
+};
+class ScreenGridCellLayer extends _core2.Layer {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  static isSupported(gl) {
+    return (0, _core.hasFeatures)(gl, [_core.FEATURES.TEXTURE_FLOAT]);
+  }
+  getShaders() {
+    return {
+      vs: _screenGridLayerVertex.default,
+      fs: _screenGridLayerFragment.default,
+      modules: [_core2.picking]
+    };
+  }
+  initializeState() {
+    const {
+      gl
+    } = this.context;
+    const attributeManager = this.getAttributeManager();
+    attributeManager.addInstanced({
+      instancePositions: {
+        size: 3,
+        update: this.calculateInstancePositions
+      },
+      instanceCounts: {
+        size: 4,
+        noAlloc: true
+      }
+    });
+    this.setState({
+      model: this._getModel(gl)
+    });
+  }
+  shouldUpdateState({
+    changeFlags
+  }) {
+    return changeFlags.somethingChanged;
+  }
+  updateState(params) {
+    super.updateState(params);
+    const {
+      oldProps,
+      props,
+      changeFlags
+    } = params;
+    const attributeManager = this.getAttributeManager();
+    if (props.numInstances !== oldProps.numInstances) {
+      attributeManager.invalidateAll();
+    } else if (oldProps.cellSizePixels !== props.cellSizePixels) {
+      attributeManager.invalidate('instancePositions');
+    }
+    this._updateUniforms(oldProps, props, changeFlags);
+  }
+  draw({
+    uniforms
+  }) {
+    const {
+      parameters,
+      maxTexture
+    } = this.props;
+    const minColor = this.props.minColor || DEFAULT_MINCOLOR;
+    const maxColor = this.props.maxColor || DEFAULT_MAXCOLOR;
+    const colorDomain = this.props.colorDomain || [1, 0];
+    const {
+      model
+    } = this.state;
+    model.setUniforms(uniforms).setUniforms({
+      minColor,
+      maxColor,
+      maxTexture,
+      colorDomain
+    }).draw({
+      parameters: {
+        depthTest: false,
+        depthMask: false,
+        ...parameters
+      }
+    });
+  }
+  calculateInstancePositions(attribute, {
+    numInstances
+  }) {
+    const {
+      width,
+      height
+    } = this.context.viewport;
+    const {
+      cellSizePixels
+    } = this.props;
+    const numCol = Math.ceil(width / cellSizePixels);
+    const {
+      value,
+      size
+    } = attribute;
+    for (let i = 0; i < numInstances; i++) {
+      const x = i % numCol;
+      const y = Math.floor(i / numCol);
+      value[i * size + 0] = x * cellSizePixels / width * 2 - 1;
+      value[i * size + 1] = 1 - y * cellSizePixels / height * 2;
+      value[i * size + 2] = 0;
+    }
+  }
+  _getModel(gl) {
+    return new _core.Model(gl, {
+      ...this.getShaders(),
+      id: this.props.id,
+      geometry: new _core.Geometry({
+        drawMode: 6,
+        attributes: {
+          positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0])
+        }
+      }),
+      isInstanced: true
+    });
+  }
+  _shouldUseMinMax() {
+    const {
+      minColor,
+      maxColor,
+      colorDomain,
+      colorRange
+    } = this.props;
+    if (minColor || maxColor) {
+      _core2.log.deprecated('ScreenGridLayer props: minColor and maxColor', 'colorRange, colorDomain')();
+      return true;
+    }
+    if (colorDomain || colorRange) {
+      return false;
+    }
+    return true;
+  }
+  _updateUniforms(oldProps, props, changeFlags) {
+    const {
+      model
+    } = this.state;
+    if (COLOR_PROPS.some(key => oldProps[key] !== props[key])) {
+      model.setUniforms({
+        shouldUseMinMax: this._shouldUseMinMax()
+      });
+    }
+    if (oldProps.colorRange !== props.colorRange) {
+      model.setUniforms({
+        colorRange: (0, _colorUtils.colorRangeToFlatArray)(props.colorRange)
+      });
+    }
+    if (oldProps.cellMarginPixels !== props.cellMarginPixels || oldProps.cellSizePixels !== props.cellSizePixels || changeFlags.viewportChanged) {
+      const {
+        width,
+        height
+      } = this.context.viewport;
+      const {
+        cellSizePixels,
+        cellMarginPixels
+      } = this.props;
+      const margin = cellSizePixels > cellMarginPixels ? cellMarginPixels : 0;
+      const cellScale = new Float32Array([(cellSizePixels - margin) / width * 2, -(cellSizePixels - margin) / height * 2, 1]);
+      model.setUniforms({
+        cellScale
+      });
+    }
+  }
+}
+exports.default = ScreenGridCellLayer;
+(0, _defineProperty2.default)(ScreenGridCellLayer, "layerName", 'ScreenGridCellLayer');
+(0, _defineProperty2.default)(ScreenGridCellLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","../utils/color-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js","./screen-grid-layer-vertex.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-layer-vertex.glsl.js","./screen-grid-layer-fragment.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-layer-fragment.glsl.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/prop-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.filterProps = filterProps;
+function filterProps(props, filterKeys) {
+  const filteredProps = {};
+  for (const key in props) {
+    if (!filterKeys.includes(key)) {
+      filteredProps[key] = props[key];
+    }
+  }
+  return filteredProps;
+}
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/aggregation-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@deck.gl/core");
+var _core2 = require("@luma.gl/core");
+var _propUtils = require("./utils/prop-utils");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+class AggregationLayer extends _core.CompositeLayer {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  initializeAggregationLayer(dimensions) {
+    super.initializeState(this.context);
+    this.setState({
+      ignoreProps: (0, _propUtils.filterProps)(this.constructor._propTypes, dimensions.data.props),
+      dimensions
+    });
+  }
+  updateState(opts) {
+    super.updateState(opts);
+    const {
+      changeFlags
+    } = opts;
+    if (changeFlags.extensionsChanged) {
+      const shaders = this.getShaders({});
+      if (shaders && shaders.defines) {
+        shaders.defines.NON_INSTANCED_MODEL = 1;
+      }
+      this.updateShaders(shaders);
+    }
+    this._updateAttributes();
+  }
+  updateAttributes(changedAttributes) {
+    this.setState({
+      changedAttributes
+    });
+  }
+  getAttributes() {
+    return this.getAttributeManager().getShaderAttributes();
+  }
+  getModuleSettings() {
+    const {
+      viewport,
+      mousePosition,
+      gl
+    } = this.context;
+    const moduleSettings = Object.assign(Object.create(this.props), {
+      viewport,
+      mousePosition,
+      pickingActive: 0,
+      devicePixelRatio: (0, _core2.cssToDeviceRatio)(gl)
+    });
+    return moduleSettings;
+  }
+  updateShaders(shaders) {}
+  isAggregationDirty(updateOpts, params = {}) {
+    const {
+      props,
+      oldProps,
+      changeFlags
+    } = updateOpts;
+    const {
+      compareAll = false,
+      dimension
+    } = params;
+    const {
+      ignoreProps
+    } = this.state;
+    const {
+      props: dataProps,
+      accessors = []
+    } = dimension;
+    const {
+      updateTriggersChanged
+    } = changeFlags;
+    if (changeFlags.dataChanged) {
+      return true;
+    }
+    if (updateTriggersChanged) {
+      if (updateTriggersChanged.all) {
+        return true;
+      }
+      for (const accessor of accessors) {
+        if (updateTriggersChanged[accessor]) {
+          return true;
+        }
+      }
+    }
+    if (compareAll) {
+      if (changeFlags.extensionsChanged) {
+        return true;
+      }
+      return (0, _core._compareProps)({
+        oldProps,
+        newProps: props,
+        ignoreProps,
+        propTypes: this.constructor._propTypes
+      });
+    }
+    for (const name of dataProps) {
+      if (props[name] !== oldProps[name]) {
+        return true;
+      }
+    }
+    return false;
+  }
+  isAttributeChanged(name) {
+    const {
+      changedAttributes
+    } = this.state;
+    if (!name) {
+      return !isObjectEmpty(changedAttributes);
+    }
+    return changedAttributes && changedAttributes[name] !== undefined;
+  }
+  _getAttributeManager() {
+    return new _core.AttributeManager(this.context.gl, {
+      id: this.props.id,
+      stats: this.context.stats
+    });
+  }
+}
+exports.default = AggregationLayer;
+(0, _defineProperty2.default)(AggregationLayer, "layerName", 'AggregationLayer');
+function isObjectEmpty(obj) {
+  let isEmpty = true;
+  for (const key in obj) {
+    isEmpty = false;
+    break;
+  }
+  return isEmpty;
+}
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","./utils/prop-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/prop-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/scale-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.clamp = clamp;
+exports.getLinearDomain = getLinearDomain;
+exports.getLinearScale = getLinearScale;
+exports.getOrdinalDomain = getOrdinalDomain;
+exports.getOrdinalScale = getOrdinalScale;
+exports.getQuantileDomain = getQuantileDomain;
+exports.getQuantileScale = getQuantileScale;
+exports.getQuantizeScale = getQuantizeScale;
+exports.getScale = getScale;
+exports.getScaleDomain = getScaleDomain;
+exports.getScaleFunctionByScaleType = getScaleFunctionByScaleType;
+exports.linearScale = linearScale;
+exports.quantizeScale = quantizeScale;
+exports.unique = unique;
+var _core = require("@deck.gl/core");
+function getScale(domain, range, scaleFunction) {
+  const scale = scaleFunction;
+  scale.domain = () => domain;
+  scale.range = () => range;
+  return scale;
+}
+function getQuantizeScale(domain, range) {
+  const scaleFunction = value => quantizeScale(domain, range, value);
+  return getScale(domain, range, scaleFunction);
+}
+function getLinearScale(domain, range) {
+  const scaleFunction = value => linearScale(domain, range, value);
+  return getScale(domain, range, scaleFunction);
+}
+function getQuantileScale(domain, range) {
+  const sortedDomain = domain.sort(ascending);
+  let i = 0;
+  const n = Math.max(1, range.length);
+  const thresholds = new Array(n - 1);
+  while (++i < n) {
+    thresholds[i - 1] = threshold(sortedDomain, i / n);
+  }
+  const scaleFunction = value => thresholdsScale(thresholds, range, value);
+  scaleFunction.thresholds = () => thresholds;
+  return getScale(domain, range, scaleFunction);
+}
+function ascending(a, b) {
+  return a - b;
+}
+function threshold(domain, fraction) {
+  const domainLength = domain.length;
+  if (fraction <= 0 || domainLength < 2) {
+    return domain[0];
+  }
+  if (fraction >= 1) {
+    return domain[domainLength - 1];
+  }
+  const domainFraction = (domainLength - 1) * fraction;
+  const lowIndex = Math.floor(domainFraction);
+  const low = domain[lowIndex];
+  const high = domain[lowIndex + 1];
+  return low + (high - low) * (domainFraction - lowIndex);
+}
+function bisectRight(a, x) {
+  let lo = 0;
+  let hi = a.length;
+  while (lo < hi) {
+    const mid = lo + hi >>> 1;
+    if (ascending(a[mid], x) > 0) {
+      hi = mid;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return lo;
+}
+function thresholdsScale(thresholds, range, value) {
+  return range[bisectRight(thresholds, value)];
+}
+function ordinalScale(domain, domainMap, range, value) {
+  const key = "".concat(value);
+  let d = domainMap.get(key);
+  if (d === undefined) {
+    d = domain.push(value);
+    domainMap.set(key, d);
+  }
+  return range[(d - 1) % range.length];
+}
+function getOrdinalScale(domain, range) {
+  const domainMap = new Map();
+  const uniqueDomain = [];
+  for (const d of domain) {
+    const key = "".concat(d);
+    if (!domainMap.has(key)) {
+      domainMap.set(key, uniqueDomain.push(d));
+    }
+  }
+  const scaleFunction = value => ordinalScale(uniqueDomain, domainMap, range, value);
+  return getScale(domain, range, scaleFunction);
+}
+function quantizeScale(domain, range, value) {
+  const domainRange = domain[1] - domain[0];
+  if (domainRange <= 0) {
+    _core.log.warn('quantizeScale: invalid domain, returning range[0]')();
+    return range[0];
+  }
+  const step = domainRange / range.length;
+  const idx = Math.floor((value - domain[0]) / step);
+  const clampIdx = Math.max(Math.min(idx, range.length - 1), 0);
+  return range[clampIdx];
+}
+function linearScale(domain, range, value) {
+  return (value - domain[0]) / (domain[1] - domain[0]) * (range[1] - range[0]) + range[0];
+}
+function notNullOrUndefined(d) {
+  return d !== undefined && d !== null;
+}
+function unique(values) {
+  const results = [];
+  values.forEach(v => {
+    if (!results.includes(v) && notNullOrUndefined(v)) {
+      results.push(v);
+    }
+  });
+  return results;
+}
+function getTruthyValues(data, valueAccessor) {
+  const values = typeof valueAccessor === 'function' ? data.map(valueAccessor) : data;
+  return values.filter(notNullOrUndefined);
+}
+function getLinearDomain(data, valueAccessor) {
+  const sorted = getTruthyValues(data, valueAccessor).sort();
+  return sorted.length ? [sorted[0], sorted[sorted.length - 1]] : [0, 0];
+}
+function getQuantileDomain(data, valueAccessor) {
+  return getTruthyValues(data, valueAccessor);
+}
+function getOrdinalDomain(data, valueAccessor) {
+  return unique(getTruthyValues(data, valueAccessor));
+}
+function getScaleDomain(scaleType, data, valueAccessor) {
+  switch (scaleType) {
+    case 'quantize':
+    case 'linear':
+      return getLinearDomain(data, valueAccessor);
+    case 'quantile':
+      return getQuantileDomain(data, valueAccessor);
+    case 'ordinal':
+      return getOrdinalDomain(data, valueAccessor);
+    default:
+      return getLinearDomain(data, valueAccessor);
+  }
+}
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+function getScaleFunctionByScaleType(scaleType) {
+  switch (scaleType) {
+    case 'quantize':
+      return getQuantizeScale;
+    case 'linear':
+      return getLinearScale;
+    case 'quantile':
+      return getQuantileScale;
+    case 'ordinal':
+      return getOrdinalScale;
+    default:
+      return getQuantizeScale;
+  }
+}
+},{"@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/bin-sorter.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _scaleUtils = require("./scale-utils");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const defaultGetValue = points => points.length;
+const MAX_32_BIT_FLOAT = 3.402823466e38;
+const defaultGetPoints = bin => bin.points;
+const defaultGetIndex = bin => bin.index;
+const ascending = (a, b) => a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN;
+const defaultProps = {
+  getValue: defaultGetValue,
+  getPoints: defaultGetPoints,
+  getIndex: defaultGetIndex,
+  filterData: null
+};
+class BinSorter {
+  constructor(bins = [], props = defaultProps) {
+    (0, _defineProperty2.default)(this, "maxCount", void 0);
+    (0, _defineProperty2.default)(this, "maxValue", void 0);
+    (0, _defineProperty2.default)(this, "minValue", void 0);
+    (0, _defineProperty2.default)(this, "totalCount", void 0);
+    (0, _defineProperty2.default)(this, "aggregatedBins", void 0);
+    (0, _defineProperty2.default)(this, "sortedBins", void 0);
+    (0, _defineProperty2.default)(this, "binMap", void 0);
+    this.aggregatedBins = this.getAggregatedBins(bins, props);
+    this._updateMinMaxValues();
+    this.binMap = this.getBinMap();
+  }
+  getAggregatedBins(bins, props) {
+    const {
+      getValue = defaultGetValue,
+      getPoints = defaultGetPoints,
+      getIndex = defaultGetIndex,
+      filterData
+    } = props;
+    const hasFilter = typeof filterData === 'function';
+    const binCount = bins.length;
+    const aggregatedBins = [];
+    let index = 0;
+    for (let binIndex = 0; binIndex < binCount; binIndex++) {
+      const bin = bins[binIndex];
+      const points = getPoints(bin);
+      const i = getIndex(bin);
+      const filteredPoints = hasFilter ? points.filter(filterData) : points;
+      bin.filteredPoints = hasFilter ? filteredPoints : null;
+      const value = filteredPoints.length ? getValue(filteredPoints) : null;
+      if (value !== null && value !== undefined) {
+        aggregatedBins[index] = {
+          i: Number.isFinite(i) ? i : binIndex,
+          value,
+          counts: filteredPoints.length
+        };
+        index++;
+      }
+    }
+    return aggregatedBins;
+  }
+  _percentileToIndex(percentileRange) {
+    const len = this.sortedBins.length;
+    if (len < 2) {
+      return [0, 0];
+    }
+    const [lower, upper] = percentileRange.map(n => (0, _scaleUtils.clamp)(n, 0, 100));
+    const lowerIdx = Math.ceil(lower / 100 * (len - 1));
+    const upperIdx = Math.floor(upper / 100 * (len - 1));
+    return [lowerIdx, upperIdx];
+  }
+  getBinMap() {
+    const binMap = {};
+    for (const bin of this.aggregatedBins) {
+      binMap[bin.i] = bin;
+    }
+    return binMap;
+  }
+  _updateMinMaxValues() {
+    let maxCount = 0;
+    let maxValue = 0;
+    let minValue = MAX_32_BIT_FLOAT;
+    let totalCount = 0;
+    for (const x of this.aggregatedBins) {
+      maxCount = maxCount > x.counts ? maxCount : x.counts;
+      maxValue = maxValue > x.value ? maxValue : x.value;
+      minValue = minValue < x.value ? minValue : x.value;
+      totalCount += x.counts;
+    }
+    this.maxCount = maxCount;
+    this.maxValue = maxValue;
+    this.minValue = minValue;
+    this.totalCount = totalCount;
+  }
+  getValueRange(percentileRange) {
+    if (!this.sortedBins) {
+      this.sortedBins = this.aggregatedBins.sort((a, b) => ascending(a.value, b.value));
+    }
+    if (!this.sortedBins.length) {
+      return [];
+    }
+    let lowerIdx = 0;
+    let upperIdx = this.sortedBins.length - 1;
+    if (Array.isArray(percentileRange)) {
+      const idxRange = this._percentileToIndex(percentileRange);
+      lowerIdx = idxRange[0];
+      upperIdx = idxRange[1];
+    }
+    return [this.sortedBins[lowerIdx].value, this.sortedBins[upperIdx].value];
+  }
+  getValueDomainByScale(scale, [lower = 0, upper = 100] = []) {
+    if (!this.sortedBins) {
+      this.sortedBins = this.aggregatedBins.sort((a, b) => ascending(a.value, b.value));
+    }
+    if (!this.sortedBins.length) {
+      return [];
+    }
+    const indexEdge = this._percentileToIndex([lower, upper]);
+    return this._getScaleDomain(scale, indexEdge);
+  }
+  _getScaleDomain(scaleType, [lowerIdx, upperIdx]) {
+    const bins = this.sortedBins;
+    switch (scaleType) {
+      case 'quantize':
+      case 'linear':
+        return [bins[lowerIdx].value, bins[upperIdx].value];
+      case 'quantile':
+        return (0, _scaleUtils.getQuantileDomain)(bins.slice(lowerIdx, upperIdx + 1), d => d.value);
+      case 'ordinal':
+        return (0, _scaleUtils.getOrdinalDomain)(bins, d => d.value);
+      default:
+        return [bins[lowerIdx].value, bins[upperIdx].value];
+    }
+  }
+}
+exports.default = BinSorter;
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","./scale-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/scale-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/grid-aggregation-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.alignToCell = alignToCell;
+exports.getBoundingBox = getBoundingBox;
+exports.getGridOffset = getGridOffset;
+exports.getGridParams = getGridParams;
+var _core = require("@deck.gl/core");
+const R_EARTH = 6378000;
+function toFinite(n) {
+  return Number.isFinite(n) ? n : 0;
+}
+function getBoundingBox(attributes, vertexCount) {
+  const positions = attributes.positions.value;
+  let yMin = Infinity;
+  let yMax = -Infinity;
+  let xMin = Infinity;
+  let xMax = -Infinity;
+  let y;
+  let x;
+  for (let i = 0; i < vertexCount; i++) {
+    x = positions[i * 3];
+    y = positions[i * 3 + 1];
+    yMin = y < yMin ? y : yMin;
+    yMax = y > yMax ? y : yMax;
+    xMin = x < xMin ? x : xMin;
+    xMax = x > xMax ? x : xMax;
+  }
+  const boundingBox = {
+    xMin: toFinite(xMin),
+    xMax: toFinite(xMax),
+    yMin: toFinite(yMin),
+    yMax: toFinite(yMax)
+  };
+  return boundingBox;
+}
+function getTranslation(boundingBox, gridOffset, coordinateSystem, viewport) {
+  const {
+    width,
+    height
+  } = viewport;
+  const worldOrigin = coordinateSystem === _core.COORDINATE_SYSTEM.CARTESIAN ? [-width / 2, -height / 2] : [-180, -90];
+  _core.log.assert(coordinateSystem === _core.COORDINATE_SYSTEM.CARTESIAN || coordinateSystem === _core.COORDINATE_SYSTEM.LNGLAT || coordinateSystem === _core.COORDINATE_SYSTEM.DEFAULT);
+  const {
+    xMin,
+    yMin
+  } = boundingBox;
+  return [-1 * (alignToCell(xMin - worldOrigin[0], gridOffset.xOffset) + worldOrigin[0]), -1 * (alignToCell(yMin - worldOrigin[1], gridOffset.yOffset) + worldOrigin[1])];
+}
+function alignToCell(inValue, cellSize) {
+  const sign = inValue < 0 ? -1 : 1;
+  let value = sign < 0 ? Math.abs(inValue) + cellSize : Math.abs(inValue);
+  value = Math.floor(value / cellSize) * cellSize;
+  return value * sign;
+}
+function getGridOffset(boundingBox, cellSize, convertToMeters = true) {
+  if (!convertToMeters) {
+    return {
+      xOffset: cellSize,
+      yOffset: cellSize
+    };
+  }
+  const {
+    yMin,
+    yMax
+  } = boundingBox;
+  const centerLat = (yMin + yMax) / 2;
+  return calculateGridLatLonOffset(cellSize, centerLat);
+}
+function getGridParams(boundingBox, cellSize, viewport, coordinateSystem) {
+  const gridOffset = getGridOffset(boundingBox, cellSize, coordinateSystem !== _core.COORDINATE_SYSTEM.CARTESIAN);
+  const translation = getTranslation(boundingBox, gridOffset, coordinateSystem, viewport);
+  const {
+    xMin,
+    yMin,
+    xMax,
+    yMax
+  } = boundingBox;
+  const width = xMax - xMin + gridOffset.xOffset;
+  const height = yMax - yMin + gridOffset.yOffset;
+  const numCol = Math.ceil(width / gridOffset.xOffset);
+  const numRow = Math.ceil(height / gridOffset.yOffset);
+  return {
+    gridOffset,
+    translation,
+    width,
+    height,
+    numCol,
+    numRow
+  };
+}
+function calculateGridLatLonOffset(cellSize, latitude) {
+  const yOffset = calculateLatOffset(cellSize);
+  const xOffset = calculateLonOffset(latitude, cellSize);
+  return {
+    yOffset,
+    xOffset
+  };
+}
+function calculateLatOffset(dy) {
+  return dy / R_EARTH * (180 / Math.PI);
+}
+function calculateLonOffset(lat, dx) {
+  return dx / R_EARTH * (180 / Math.PI) / Math.cos(lat * Math.PI / 180);
+}
+},{"@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/grid-aggregator.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.pointToDensityGridDataCPU = pointToDensityGridDataCPU;
+var _core = require("@deck.gl/core");
+var _gridAggregationUtils = require("../utils/grid-aggregation-utils");
+function pointToDensityGridDataCPU(props, aggregationParams) {
+  const hashInfo = pointsToGridHashing(props, aggregationParams);
+  const result = getGridLayerDataFromGridHash(hashInfo);
+  return {
+    gridHash: hashInfo.gridHash,
+    gridOffset: hashInfo.gridOffset,
+    data: result
+  };
+}
+function pointsToGridHashing(props, aggregationParams) {
+  const {
+    data = [],
+    cellSize
+  } = props;
+  const {
+    attributes,
+    viewport,
+    projectPoints,
+    numInstances
+  } = aggregationParams;
+  const positions = attributes.positions.value;
+  const {
+    size
+  } = attributes.positions.getAccessor();
+  const boundingBox = aggregationParams.boundingBox || getPositionBoundingBox(attributes.positions, numInstances);
+  const offsets = aggregationParams.posOffset || [180, 90];
+  const gridOffset = aggregationParams.gridOffset || (0, _gridAggregationUtils.getGridOffset)(boundingBox, cellSize);
+  if (gridOffset.xOffset <= 0 || gridOffset.yOffset <= 0) {
+    return {
+      gridHash: {},
+      gridOffset
+    };
+  }
+  const {
+    width,
+    height
+  } = viewport;
+  const numCol = Math.ceil(width / gridOffset.xOffset);
+  const numRow = Math.ceil(height / gridOffset.yOffset);
+  const gridHash = {};
+  const {
+    iterable,
+    objectInfo
+  } = (0, _core.createIterable)(data);
+  const position = new Array(3);
+  for (const pt of iterable) {
+    objectInfo.index++;
+    position[0] = positions[objectInfo.index * size];
+    position[1] = positions[objectInfo.index * size + 1];
+    position[2] = size >= 3 ? positions[objectInfo.index * size + 2] : 0;
+    const [x, y] = projectPoints ? viewport.project(position) : position;
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      const yIndex = Math.floor((y + offsets[1]) / gridOffset.yOffset);
+      const xIndex = Math.floor((x + offsets[0]) / gridOffset.xOffset);
+      if (!projectPoints || xIndex >= 0 && xIndex < numCol && yIndex >= 0 && yIndex < numRow) {
+        const key = "".concat(yIndex, "-").concat(xIndex);
+        gridHash[key] = gridHash[key] || {
+          count: 0,
+          points: [],
+          lonIdx: xIndex,
+          latIdx: yIndex
+        };
+        gridHash[key].count += 1;
+        gridHash[key].points.push({
+          source: pt,
+          index: objectInfo.index
+        });
+      }
+    }
+  }
+  return {
+    gridHash,
+    gridOffset,
+    offsets: [offsets[0] * -1, offsets[1] * -1]
+  };
+}
+function getGridLayerDataFromGridHash({
+  gridHash,
+  gridOffset,
+  offsets
+}) {
+  const data = new Array(Object.keys(gridHash).length);
+  let i = 0;
+  for (const key in gridHash) {
+    const idxs = key.split('-');
+    const latIdx = parseInt(idxs[0], 10);
+    const lonIdx = parseInt(idxs[1], 10);
+    const index = i++;
+    data[index] = {
+      index,
+      position: [offsets[0] + gridOffset.xOffset * lonIdx, offsets[1] + gridOffset.yOffset * latIdx],
+      ...gridHash[key]
+    };
+  }
+  return data;
+}
+function getPositionBoundingBox(positionAttribute, numInstance) {
+  const positions = positionAttribute.value;
+  const {
+    size
+  } = positionAttribute.getAccessor();
+  let yMin = Infinity;
+  let yMax = -Infinity;
+  let xMin = Infinity;
+  let xMax = -Infinity;
+  let y;
+  let x;
+  for (let i = 0; i < numInstance; i++) {
+    x = positions[i * size];
+    y = positions[i * size + 1];
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      yMin = y < yMin ? y : yMin;
+      yMax = y > yMax ? y : yMax;
+      xMin = x < xMin ? x : xMin;
+      xMax = x > xMax ? x : xMax;
+    }
+  }
+  return {
+    xMin,
+    xMax,
+    yMin,
+    yMax
+  };
+}
+},{"@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","../utils/grid-aggregation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/grid-aggregation-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/grid-aggregation-layer.js":[function(require,module,exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _aggregationLayer = _interopRequireDefault(require("./aggregation-layer"));
+var _gpuGridAggregator = _interopRequireDefault(require("./utils/gpu-grid-aggregation/gpu-grid-aggregator"));
+var _core = require("@luma.gl/core");
+var _core2 = require("@deck.gl/core");
+var _binSorter = _interopRequireDefault(require("./utils/bin-sorter"));
+var _gridAggregator = require("./cpu-grid-layer/grid-aggregator");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+class GridAggregationLayer extends _aggregationLayer.default {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  initializeAggregationLayer({
+    dimensions
+  }) {
+    const {
+      gl
+    } = this.context;
+    super.initializeAggregationLayer(dimensions);
+    this.setState({
+      layerData: {},
+      gpuGridAggregator: new _gpuGridAggregator.default(gl, {
+        id: "".concat(this.id, "-gpu-aggregator")
+      }),
+      cpuGridAggregator: _gridAggregator.pointToDensityGridDataCPU
+    });
+  }
+  updateState(opts) {
+    super.updateState(opts);
+    this.updateAggregationState(opts);
+    const {
+      aggregationDataDirty,
+      aggregationWeightsDirty,
+      gpuAggregation
+    } = this.state;
+    if (this.getNumInstances() <= 0) {
+      return;
+    }
+    let aggregationDirty = false;
+    if (aggregationDataDirty || gpuAggregation && aggregationWeightsDirty) {
+      this._updateAggregation(opts);
+      aggregationDirty = true;
+    }
+    if (!gpuAggregation && (aggregationDataDirty || aggregationWeightsDirty)) {
+      this._updateWeightBins();
+      this._uploadAggregationResults();
+      aggregationDirty = true;
+    }
+    this.setState({
+      aggregationDirty
+    });
+  }
+  finalizeState(context) {
+    var _this$state$gpuGridAg;
+    const {
+      count
+    } = this.state.weights;
+    if (count && count.aggregationBuffer) {
+      count.aggregationBuffer.delete();
+    }
+    (_this$state$gpuGridAg = this.state.gpuGridAggregator) === null || _this$state$gpuGridAg === void 0 ? void 0 : _this$state$gpuGridAg.delete();
+    super.finalizeState(context);
+  }
+  updateShaders(shaders) {
+    if (this.state.gpuAggregation) {
+      this.state.gpuGridAggregator.updateShaders(shaders);
+    }
+  }
+  updateAggregationState(opts) {
+    _core2.log.assert(false);
+  }
+  allocateResources(numRow, numCol) {
+    if (this.state.numRow !== numRow || this.state.numCol !== numCol) {
+      const dataBytes = numCol * numRow * 4 * 4;
+      const gl = this.context.gl;
+      const {
+        weights
+      } = this.state;
+      for (const name in weights) {
+        const weight = weights[name];
+        if (weight.aggregationBuffer) {
+          weight.aggregationBuffer.delete();
+        }
+        weight.aggregationBuffer = new _core.Buffer(gl, {
+          byteLength: dataBytes,
+          accessor: {
+            size: 4,
+            type: 5126,
+            divisor: 1
+          }
+        });
+      }
+    }
+  }
+  updateResults({
+    aggregationData,
+    maxMinData,
+    maxData,
+    minData
+  }) {
+    const {
+      count
+    } = this.state.weights;
+    if (count) {
+      count.aggregationData = aggregationData;
+      count.maxMinData = maxMinData;
+      count.maxData = maxData;
+      count.minData = minData;
+    }
+  }
+  _updateAggregation(opts) {
+    const {
+      cpuGridAggregator,
+      gpuGridAggregator,
+      gridOffset,
+      posOffset,
+      translation = [0, 0],
+      scaling = [0, 0, 0],
+      boundingBox,
+      projectPoints,
+      gpuAggregation,
+      numCol,
+      numRow
+    } = this.state;
+    const {
+      props
+    } = opts;
+    const {
+      viewport
+    } = this.context;
+    const attributes = this.getAttributes();
+    const vertexCount = this.getNumInstances();
+    if (!gpuAggregation) {
+      const result = cpuGridAggregator(props, {
+        gridOffset,
+        projectPoints,
+        attributes,
+        viewport,
+        posOffset,
+        boundingBox
+      });
+      this.setState({
+        layerData: result
+      });
+    } else {
+      const {
+        weights
+      } = this.state;
+      gpuGridAggregator.run({
+        weights,
+        cellSize: [gridOffset.xOffset, gridOffset.yOffset],
+        numCol,
+        numRow,
+        translation,
+        scaling,
+        vertexCount,
+        projectPoints,
+        attributes,
+        moduleSettings: this.getModuleSettings()
+      });
+    }
+  }
+  _updateWeightBins() {
+    const {
+      getValue
+    } = this.state;
+    const sortedBins = new _binSorter.default(this.state.layerData.data || [], {
+      getValue
+    });
+    this.setState({
+      sortedBins
+    });
+  }
+  _uploadAggregationResults() {
+    const {
+      numCol,
+      numRow
+    } = this.state;
+    const {
+      data
+    } = this.state.layerData;
+    const {
+      aggregatedBins,
+      minValue,
+      maxValue,
+      totalCount
+    } = this.state.sortedBins;
+    const ELEMENTCOUNT = 4;
+    const aggregationSize = numCol * numRow * ELEMENTCOUNT;
+    const aggregationData = new Float32Array(aggregationSize).fill(0);
+    for (const bin of aggregatedBins) {
+      const {
+        lonIdx,
+        latIdx
+      } = data[bin.i];
+      const {
+        value,
+        counts
+      } = bin;
+      const cellIndex = (lonIdx + latIdx * numCol) * ELEMENTCOUNT;
+      aggregationData[cellIndex] = value;
+      aggregationData[cellIndex + ELEMENTCOUNT - 1] = counts;
+    }
+    const maxMinData = new Float32Array([maxValue, 0, 0, minValue]);
+    const maxData = new Float32Array([maxValue, 0, 0, totalCount]);
+    const minData = new Float32Array([minValue, 0, 0, totalCount]);
+    this.updateResults({
+      aggregationData,
+      maxMinData,
+      maxData,
+      minData
+    });
+  }
+}
+exports.default = GridAggregationLayer;
+(0, _defineProperty2.default)(GridAggregationLayer, "layerName", 'GridAggregationLayer');
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","./aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/aggregation-layer.js","./utils/gpu-grid-aggregation/gpu-grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","./utils/bin-sorter":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/bin-sorter.js","./cpu-grid-layer/grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/grid-aggregator.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@deck.gl/core");
+var _gpuGridAggregator = _interopRequireDefault(require("../utils/gpu-grid-aggregation/gpu-grid-aggregator"));
+var _aggregationOperationUtils = require("../utils/aggregation-operation-utils");
+var _screenGridCellLayer = _interopRequireDefault(require("./screen-grid-cell-layer"));
+var _gridAggregationLayer = _interopRequireDefault(require("../grid-aggregation-layer"));
+var _resourceUtils = require("../utils/resource-utils.js");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const defaultProps = {
+  ..._screenGridCellLayer.default.defaultProps,
+  getPosition: {
+    type: 'accessor',
+    value: d => d.position
+  },
+  getWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  gpuAggregation: true,
+  aggregation: 'SUM'
+};
+const POSITION_ATTRIBUTE_NAME = 'positions';
+const DIMENSIONS = {
+  data: {
+    props: ['cellSizePixels']
+  },
+  weights: {
+    props: ['aggregation'],
+    accessors: ['getWeight']
+  }
+};
+class ScreenGridLayer extends _gridAggregationLayer.default {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  initializeState() {
+    const {
+      gl
+    } = this.context;
+    if (!_screenGridCellLayer.default.isSupported(gl)) {
+      this.setState({
+        supported: false
+      });
+      _core.log.error("ScreenGridLayer: ".concat(this.id, " is not supported on this browser"))();
+      return;
+    }
+    super.initializeAggregationLayer({
+      dimensions: DIMENSIONS,
+      getCellSize: props => props.cellSizePixels
+    });
+    const weights = {
+      count: {
+        size: 1,
+        operation: _aggregationOperationUtils.AGGREGATION_OPERATION.SUM,
+        needMax: true,
+        maxTexture: (0, _resourceUtils.getFloatTexture)(gl, {
+          id: "".concat(this.id, "-max-texture")
+        })
+      }
+    };
+    this.setState({
+      supported: true,
+      projectPoints: true,
+      weights,
+      subLayerData: {
+        attributes: {}
+      },
+      maxTexture: weights.count.maxTexture,
+      positionAttributeName: 'positions',
+      posOffset: [0, 0],
+      translation: [1, -1]
+    });
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      [POSITION_ATTRIBUTE_NAME]: {
+        size: 3,
+        accessor: 'getPosition',
+        type: 5130,
+        fp64: this.use64bitPositions()
+      },
+      count: {
+        size: 3,
+        accessor: 'getWeight'
+      }
+    });
+  }
+  shouldUpdateState({
+    changeFlags
+  }) {
+    return this.state.supported && changeFlags.somethingChanged;
+  }
+  updateState(opts) {
+    super.updateState(opts);
+  }
+  renderLayers() {
+    if (!this.state.supported) {
+      return [];
+    }
+    const {
+      maxTexture,
+      numRow,
+      numCol,
+      weights
+    } = this.state;
+    const {
+      updateTriggers
+    } = this.props;
+    const {
+      aggregationBuffer
+    } = weights.count;
+    const CellLayerClass = this.getSubLayerClass('cells', _screenGridCellLayer.default);
+    return new CellLayerClass(this.props, this.getSubLayerProps({
+      id: 'cell-layer',
+      updateTriggers
+    }), {
+      data: {
+        attributes: {
+          instanceCounts: aggregationBuffer
+        }
+      },
+      maxTexture,
+      numInstances: numRow * numCol
+    });
+  }
+  finalizeState(context) {
+    super.finalizeState(context);
+    const {
+      aggregationBuffer,
+      maxBuffer,
+      maxTexture
+    } = this.state;
+    aggregationBuffer === null || aggregationBuffer === void 0 ? void 0 : aggregationBuffer.delete();
+    maxBuffer === null || maxBuffer === void 0 ? void 0 : maxBuffer.delete();
+    maxTexture === null || maxTexture === void 0 ? void 0 : maxTexture.delete();
+  }
+  getPickingInfo({
+    info
+  }) {
+    const {
+      index
+    } = info;
+    if (index >= 0) {
+      const {
+        gpuGridAggregator,
+        gpuAggregation,
+        weights
+      } = this.state;
+      const aggregationResults = gpuAggregation ? gpuGridAggregator.getData('count') : weights.count;
+      info.object = _gpuGridAggregator.default.getAggregationData({
+        pixelIndex: index,
+        ...aggregationResults
+      });
+    }
+    return info;
+  }
+  updateResults({
+    aggregationData,
+    maxData
+  }) {
+    const {
+      count
+    } = this.state.weights;
+    count.aggregationData = aggregationData;
+    count.aggregationBuffer.setData({
+      data: aggregationData
+    });
+    count.maxData = maxData;
+    count.maxTexture.setImageData({
+      data: maxData
+    });
+  }
+  updateAggregationState(opts) {
+    const cellSize = opts.props.cellSizePixels;
+    const cellSizeChanged = opts.oldProps.cellSizePixels !== cellSize;
+    const {
+      viewportChanged
+    } = opts.changeFlags;
+    let gpuAggregation = opts.props.gpuAggregation;
+    if (this.state.gpuAggregation !== opts.props.gpuAggregation) {
+      if (gpuAggregation && !_gpuGridAggregator.default.isSupported(this.context.gl)) {
+        _core.log.warn('GPU Grid Aggregation not supported, falling back to CPU')();
+        gpuAggregation = false;
+      }
+    }
+    const gpuAggregationChanged = gpuAggregation !== this.state.gpuAggregation;
+    this.setState({
+      gpuAggregation
+    });
+    const positionsChanged = this.isAttributeChanged(POSITION_ATTRIBUTE_NAME);
+    const {
+      dimensions
+    } = this.state;
+    const {
+      data,
+      weights
+    } = dimensions;
+    const aggregationDataDirty = positionsChanged || gpuAggregationChanged || viewportChanged || this.isAggregationDirty(opts, {
+      compareAll: gpuAggregation,
+      dimension: data
+    });
+    const aggregationWeightsDirty = this.isAggregationDirty(opts, {
+      dimension: weights
+    });
+    this.setState({
+      aggregationDataDirty,
+      aggregationWeightsDirty
+    });
+    const {
+      viewport
+    } = this.context;
+    if (viewportChanged || cellSizeChanged) {
+      const {
+        width,
+        height
+      } = viewport;
+      const numCol = Math.ceil(width / cellSize);
+      const numRow = Math.ceil(height / cellSize);
+      this.allocateResources(numRow, numCol);
+      this.setState({
+        scaling: [width / 2, -height / 2, 1],
+        gridOffset: {
+          xOffset: cellSize,
+          yOffset: cellSize
+        },
+        width,
+        height,
+        numCol,
+        numRow
+      });
+    }
+    if (aggregationWeightsDirty) {
+      this._updateAccessors(opts);
+    }
+    if (aggregationDataDirty || aggregationWeightsDirty) {
+      this._resetResults();
+    }
+  }
+  _updateAccessors(opts) {
+    const {
+      getWeight,
+      aggregation,
+      data
+    } = opts.props;
+    const {
+      count
+    } = this.state.weights;
+    if (count) {
+      count.getWeight = getWeight;
+      count.operation = _aggregationOperationUtils.AGGREGATION_OPERATION[aggregation];
+    }
+    this.setState({
+      getValue: (0, _aggregationOperationUtils.getValueFunc)(aggregation, getWeight, {
+        data
+      })
+    });
+  }
+  _resetResults() {
+    const {
+      count
+    } = this.state.weights;
+    if (count) {
+      count.aggregationData = null;
+    }
+  }
+}
+exports.default = ScreenGridLayer;
+(0, _defineProperty2.default)(ScreenGridLayer, "layerName", 'ScreenGridLayer');
+(0, _defineProperty2.default)(ScreenGridLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","../utils/gpu-grid-aggregation/gpu-grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js","../utils/aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js","./screen-grid-cell-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-cell-layer.js","../grid-aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/grid-aggregation-layer.js","../utils/resource-utils.js":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/resource-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/cpu-aggregator.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _binSorter = _interopRequireDefault(require("./bin-sorter"));
+var _scaleUtils = require("./scale-utils");
+var _aggregationOperationUtils = require("./aggregation-operation-utils");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+function nop() {}
+const dimensionSteps = ['getBins', 'getDomain', 'getScaleFunc'];
+const defaultDimensions = [{
+  key: 'fillColor',
+  accessor: 'getFillColor',
+  pickingInfo: 'colorValue',
+  getBins: {
+    triggers: {
+      value: {
+        prop: 'getColorValue',
+        updateTrigger: 'getColorValue'
+      },
+      weight: {
+        prop: 'getColorWeight',
+        updateTrigger: 'getColorWeight'
+      },
+      aggregation: {
+        prop: 'colorAggregation'
+      },
+      filterData: {
+        prop: '_filterData',
+        updateTrigger: '_filterData'
+      }
+    }
+  },
+  getDomain: {
+    triggers: {
+      lowerPercentile: {
+        prop: 'lowerPercentile'
+      },
+      upperPercentile: {
+        prop: 'upperPercentile'
+      },
+      scaleType: {
+        prop: 'colorScaleType'
+      }
+    }
+  },
+  getScaleFunc: {
+    triggers: {
+      domain: {
+        prop: 'colorDomain'
+      },
+      range: {
+        prop: 'colorRange'
+      }
+    },
+    onSet: {
+      props: 'onSetColorDomain'
+    }
+  },
+  nullValue: [0, 0, 0, 0]
+}, {
+  key: 'elevation',
+  accessor: 'getElevation',
+  pickingInfo: 'elevationValue',
+  getBins: {
+    triggers: {
+      value: {
+        prop: 'getElevationValue',
+        updateTrigger: 'getElevationValue'
+      },
+      weight: {
+        prop: 'getElevationWeight',
+        updateTrigger: 'getElevationWeight'
+      },
+      aggregation: {
+        prop: 'elevationAggregation'
+      },
+      filterData: {
+        prop: '_filterData',
+        updateTrigger: '_filterData'
+      }
+    }
+  },
+  getDomain: {
+    triggers: {
+      lowerPercentile: {
+        prop: 'elevationLowerPercentile'
+      },
+      upperPercentile: {
+        prop: 'elevationUpperPercentile'
+      },
+      scaleType: {
+        prop: 'elevationScaleType'
+      }
+    }
+  },
+  getScaleFunc: {
+    triggers: {
+      domain: {
+        prop: 'elevationDomain'
+      },
+      range: {
+        prop: 'elevationRange'
+      }
+    },
+    onSet: {
+      props: 'onSetElevationDomain'
+    }
+  },
+  nullValue: -1
+}];
+const defaultGetCellSize = props => props.cellSize;
+class CPUAggregator {
+  constructor(opts) {
+    this.state = {
+      layerData: {},
+      dimensions: {}
+    };
+    this.changeFlags = {};
+    this.dimensionUpdaters = {};
+    this._getCellSize = opts.getCellSize || defaultGetCellSize;
+    this._getAggregator = opts.getAggregator;
+    this._addDimension(opts.dimensions || defaultDimensions);
+  }
+  static defaultDimensions() {
+    return defaultDimensions;
+  }
+  updateState(opts, aggregationParams) {
+    const {
+      oldProps,
+      props,
+      changeFlags
+    } = opts;
+    this.updateGetValueFuncs(oldProps, props, changeFlags);
+    const reprojectNeeded = this.needsReProjectPoints(oldProps, props, changeFlags);
+    let aggregationDirty = false;
+    if (changeFlags.dataChanged || reprojectNeeded) {
+      this.getAggregatedData(props, aggregationParams);
+      aggregationDirty = true;
+    } else {
+      const dimensionChanges = this.getDimensionChanges(oldProps, props, changeFlags) || [];
+      dimensionChanges.forEach(f => typeof f === 'function' && f());
+      aggregationDirty = true;
+    }
+    this.setState({
+      aggregationDirty
+    });
+    return this.state;
+  }
+  setState(updateObject) {
+    this.state = {
+      ...this.state,
+      ...updateObject
+    };
+  }
+  setDimensionState(key, updateObject) {
+    this.setState({
+      dimensions: {
+        ...this.state.dimensions,
+        [key]: {
+          ...this.state.dimensions[key],
+          ...updateObject
+        }
+      }
+    });
+  }
+  normalizeResult(result = {}) {
+    if (result.hexagons) {
+      return {
+        data: result.hexagons,
+        ...result
+      };
+    } else if (result.layerData) {
+      return {
+        data: result.layerData,
+        ...result
+      };
+    }
+    return result;
+  }
+  getAggregatedData(props, aggregationParams) {
+    const aggregator = this._getAggregator(props);
+    const result = aggregator(props, aggregationParams);
+    this.setState({
+      layerData: this.normalizeResult(result)
+    });
+    this.changeFlags = {
+      layerData: true
+    };
+    this.getSortedBins(props);
+  }
+  updateGetValueFuncs(oldProps, props, changeFlags) {
+    for (const key in this.dimensionUpdaters) {
+      const {
+        value,
+        weight,
+        aggregation
+      } = this.dimensionUpdaters[key].getBins.triggers;
+      let getValue = props[value.prop];
+      const getValueChanged = this.needUpdateDimensionStep(this.dimensionUpdaters[key].getBins, oldProps, props, changeFlags);
+      if (getValueChanged) {
+        if (getValue) {
+          getValue = (0, _aggregationOperationUtils.wrapGetValueFunc)(getValue, {
+            data: props.data
+          });
+        } else {
+          getValue = (0, _aggregationOperationUtils.getValueFunc)(props[aggregation.prop], props[weight.prop], {
+            data: props.data
+          });
+        }
+      }
+      if (getValue) {
+        this.setDimensionState(key, {
+          getValue
+        });
+      }
+    }
+  }
+  needsReProjectPoints(oldProps, props, changeFlags) {
+    return this._getCellSize(oldProps) !== this._getCellSize(props) || this._getAggregator(oldProps) !== this._getAggregator(props) || changeFlags.updateTriggersChanged && (changeFlags.updateTriggersChanged.all || changeFlags.updateTriggersChanged.getPosition);
+  }
+  addDimension(dimensions) {
+    this._addDimension(dimensions);
+  }
+  _addDimension(dimensions = []) {
+    dimensions.forEach(dimension => {
+      const {
+        key
+      } = dimension;
+      this.dimensionUpdaters[key] = this.getDimensionUpdaters(dimension);
+      this.state.dimensions[key] = {
+        getValue: null,
+        domain: null,
+        sortedBins: null,
+        scaleFunc: nop
+      };
+    });
+  }
+  getDimensionUpdaters({
+    key,
+    accessor,
+    pickingInfo,
+    getBins,
+    getDomain,
+    getScaleFunc,
+    nullValue
+  }) {
+    return {
+      key,
+      accessor,
+      pickingInfo,
+      getBins: {
+        updater: this.getDimensionSortedBins,
+        ...getBins
+      },
+      getDomain: {
+        updater: this.getDimensionValueDomain,
+        ...getDomain
+      },
+      getScaleFunc: {
+        updater: this.getDimensionScale,
+        ...getScaleFunc
+      },
+      attributeAccessor: this.getSubLayerDimensionAttribute(key, nullValue)
+    };
+  }
+  needUpdateDimensionStep(dimensionStep, oldProps, props, changeFlags) {
+    return Object.values(dimensionStep.triggers).some(item => {
+      if (item.updateTrigger) {
+        return changeFlags.dataChanged || changeFlags.updateTriggersChanged && (changeFlags.updateTriggersChanged.all || changeFlags.updateTriggersChanged[item.updateTrigger]);
+      }
+      return oldProps[item.prop] !== props[item.prop];
+    });
+  }
+  getDimensionChanges(oldProps, props, changeFlags) {
+    const updaters = [];
+    for (const key in this.dimensionUpdaters) {
+      const needUpdate = dimensionSteps.find(step => this.needUpdateDimensionStep(this.dimensionUpdaters[key][step], oldProps, props, changeFlags));
+      if (needUpdate) {
+        updaters.push(this.dimensionUpdaters[key][needUpdate].updater.bind(this, props, this.dimensionUpdaters[key]));
+      }
+    }
+    return updaters.length ? updaters : null;
+  }
+  getUpdateTriggers(props) {
+    const _updateTriggers = props.updateTriggers || {};
+    const updateTriggers = {};
+    for (const key in this.dimensionUpdaters) {
+      const {
+        accessor
+      } = this.dimensionUpdaters[key];
+      updateTriggers[accessor] = {};
+      dimensionSteps.forEach(step => {
+        Object.values(this.dimensionUpdaters[key][step].triggers).forEach(({
+          prop,
+          updateTrigger
+        }) => {
+          if (updateTrigger) {
+            const fromProp = _updateTriggers[updateTrigger];
+            if (typeof fromProp === 'object' && !Array.isArray(fromProp)) {
+              Object.assign(updateTriggers[accessor], fromProp);
+            } else if (fromProp !== undefined) {
+              updateTriggers[accessor][prop] = fromProp;
+            }
+          } else {
+            updateTriggers[accessor][prop] = props[prop];
+          }
+        });
+      });
+    }
+    return updateTriggers;
+  }
+  getSortedBins(props) {
+    for (const key in this.dimensionUpdaters) {
+      this.getDimensionSortedBins(props, this.dimensionUpdaters[key]);
+    }
+  }
+  getDimensionSortedBins(props, dimensionUpdater) {
+    const {
+      key
+    } = dimensionUpdater;
+    const {
+      getValue
+    } = this.state.dimensions[key];
+    const sortedBins = new _binSorter.default(this.state.layerData.data || [], {
+      getValue,
+      filterData: props._filterData
+    });
+    this.setDimensionState(key, {
+      sortedBins
+    });
+    this.getDimensionValueDomain(props, dimensionUpdater);
+  }
+  getDimensionValueDomain(props, dimensionUpdater) {
+    const {
+      getDomain,
+      key
+    } = dimensionUpdater;
+    const {
+      triggers: {
+        lowerPercentile,
+        upperPercentile,
+        scaleType
+      }
+    } = getDomain;
+    const valueDomain = this.state.dimensions[key].sortedBins.getValueDomainByScale(props[scaleType.prop], [props[lowerPercentile.prop], props[upperPercentile.prop]]);
+    this.setDimensionState(key, {
+      valueDomain
+    });
+    this.getDimensionScale(props, dimensionUpdater);
+  }
+  getDimensionScale(props, dimensionUpdater) {
+    const {
+      key,
+      getScaleFunc,
+      getDomain
+    } = dimensionUpdater;
+    const {
+      domain,
+      range
+    } = getScaleFunc.triggers;
+    const {
+      scaleType
+    } = getDomain.triggers;
+    const {
+      onSet
+    } = getScaleFunc;
+    const dimensionRange = props[range.prop];
+    const dimensionDomain = props[domain.prop] || this.state.dimensions[key].valueDomain;
+    const getScaleFunction = (0, _scaleUtils.getScaleFunctionByScaleType)(scaleType && props[scaleType.prop]);
+    const scaleFunc = getScaleFunction(dimensionDomain, dimensionRange);
+    if (typeof onSet === 'object' && typeof props[onSet.props] === 'function') {
+      props[onSet.props](scaleFunc.domain());
+    }
+    this.setDimensionState(key, {
+      scaleFunc
+    });
+  }
+  getSubLayerDimensionAttribute(key, nullValue) {
+    return cell => {
+      const {
+        sortedBins,
+        scaleFunc
+      } = this.state.dimensions[key];
+      const bin = sortedBins.binMap[cell.index];
+      if (bin && bin.counts === 0) {
+        return nullValue;
+      }
+      const cv = bin && bin.value;
+      const domain = scaleFunc.domain();
+      const isValueInDomain = cv >= domain[0] && cv <= domain[domain.length - 1];
+      return isValueInDomain ? scaleFunc(cv) : nullValue;
+    };
+  }
+  getSubLayerAccessors(props) {
+    const accessors = {};
+    for (const key in this.dimensionUpdaters) {
+      const {
+        accessor
+      } = this.dimensionUpdaters[key];
+      accessors[accessor] = this.getSubLayerDimensionAttribute(props, key);
+    }
+    return accessors;
+  }
+  getPickingInfo({
+    info
+  }) {
+    const isPicked = info.picked && info.index > -1;
+    let object = null;
+    if (isPicked) {
+      const cell = this.state.layerData.data[info.index];
+      const binInfo = {};
+      for (const key in this.dimensionUpdaters) {
+        const {
+          pickingInfo
+        } = this.dimensionUpdaters[key];
+        const {
+          sortedBins
+        } = this.state.dimensions[key];
+        const value = sortedBins.binMap[cell.index] && sortedBins.binMap[cell.index].value;
+        binInfo[pickingInfo] = value;
+      }
+      object = Object.assign(binInfo, cell, {
+        points: cell.filteredPoints || cell.points
+      });
+    }
+    info.picked = Boolean(object);
+    info.object = object;
+    return info;
+  }
+  getAccessor(dimensionKey) {
+    if (!this.dimensionUpdaters.hasOwnProperty(dimensionKey)) {
+      return nop;
+    }
+    return this.dimensionUpdaters[dimensionKey].attributeAccessor;
+  }
+}
+exports.default = CPUAggregator;
+},{"./bin-sorter":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/bin-sorter.js","./scale-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/scale-utils.js","./aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/cpu-grid-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
 var _layers = require("@deck.gl/layers");
+var _colorUtils = require("../utils/color-utils");
+var _gridAggregator = require("./grid-aggregator");
+var _cpuAggregator = _interopRequireDefault(require("../utils/cpu-aggregator"));
+var _aggregationLayer = _interopRequireDefault(require("../aggregation-layer"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+function nop() {}
+const defaultProps = {
+  colorDomain: null,
+  colorRange: _colorUtils.defaultColorRange,
+  getColorValue: {
+    type: 'accessor',
+    value: null
+  },
+  getColorWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  colorAggregation: 'SUM',
+  lowerPercentile: {
+    type: 'number',
+    min: 0,
+    max: 100,
+    value: 0
+  },
+  upperPercentile: {
+    type: 'number',
+    min: 0,
+    max: 100,
+    value: 100
+  },
+  colorScaleType: 'quantize',
+  onSetColorDomain: nop,
+  elevationDomain: null,
+  elevationRange: [0, 1000],
+  getElevationValue: {
+    type: 'accessor',
+    value: null
+  },
+  getElevationWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  elevationAggregation: 'SUM',
+  elevationLowerPercentile: {
+    type: 'number',
+    min: 0,
+    max: 100,
+    value: 0
+  },
+  elevationUpperPercentile: {
+    type: 'number',
+    min: 0,
+    max: 100,
+    value: 100
+  },
+  elevationScale: {
+    type: 'number',
+    min: 0,
+    value: 1
+  },
+  elevationScaleType: 'linear',
+  onSetElevationDomain: nop,
+  gridAggregator: _gridAggregator.pointToDensityGridDataCPU,
+  cellSize: {
+    type: 'number',
+    min: 0,
+    max: 1000,
+    value: 1000
+  },
+  coverage: {
+    type: 'number',
+    min: 0,
+    max: 1,
+    value: 1
+  },
+  getPosition: {
+    type: 'accessor',
+    value: x => x.position
+  },
+  extruded: false,
+  material: true,
+  _filterData: {
+    type: 'function',
+    value: null,
+    optional: true
+  }
+};
+class CPUGridLayer extends _aggregationLayer.default {
+  initializeState() {
+    const cpuAggregator = new _cpuAggregator.default({
+      getAggregator: props => props.gridAggregator,
+      getCellSize: props => props.cellSize
+    });
+    this.state = {
+      cpuAggregator,
+      aggregatorState: cpuAggregator.state
+    };
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      positions: {
+        size: 3,
+        type: 5130,
+        accessor: 'getPosition'
+      }
+    });
+  }
+  updateState(opts) {
+    super.updateState(opts);
+    this.setState({
+      aggregatorState: this.state.cpuAggregator.updateState(opts, {
+        viewport: this.context.viewport,
+        attributes: this.getAttributes(),
+        numInstances: this.getNumInstances()
+      })
+    });
+  }
+  getPickingInfo({
+    info
+  }) {
+    return this.state.cpuAggregator.getPickingInfo({
+      info
+    });
+  }
+  _onGetSublayerColor(cell) {
+    return this.state.cpuAggregator.getAccessor('fillColor')(cell);
+  }
+  _onGetSublayerElevation(cell) {
+    return this.state.cpuAggregator.getAccessor('elevation')(cell);
+  }
+  _getSublayerUpdateTriggers() {
+    return this.state.cpuAggregator.getUpdateTriggers(this.props);
+  }
+  renderLayers() {
+    const {
+      elevationScale,
+      extruded,
+      cellSize,
+      coverage,
+      material,
+      transitions
+    } = this.props;
+    const {
+      cpuAggregator
+    } = this.state;
+    const SubLayerClass = this.getSubLayerClass('grid-cell', _layers.GridCellLayer);
+    const updateTriggers = this._getSublayerUpdateTriggers();
+    return new SubLayerClass({
+      cellSize,
+      coverage,
+      material,
+      elevationScale,
+      extruded,
+      getFillColor: this._onGetSublayerColor.bind(this),
+      getElevation: this._onGetSublayerElevation.bind(this),
+      transitions: transitions && {
+        getFillColor: transitions.getColorValue || transitions.getColorWeight,
+        getElevation: transitions.getElevationValue || transitions.getElevationWeight
+      }
+    }, this.getSubLayerProps({
+      id: 'grid-cell',
+      updateTriggers
+    }), {
+      data: cpuAggregator.state.layerData.data
+    });
+  }
+}
+exports.default = CPUGridLayer;
+(0, _defineProperty2.default)(CPUGridLayer, "layerName", 'CPUGridLayer');
+(0, _defineProperty2.default)(CPUGridLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","../utils/color-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js","./grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/grid-aggregator.js","../utils/cpu-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/cpu-aggregator.js","../aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/aggregation-layer.js"}],"node_modules/d3-hexbin/src/hexbin.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = _default;
+var thirdPi = Math.PI / 3,
+  angles = [0, thirdPi, 2 * thirdPi, 3 * thirdPi, 4 * thirdPi, 5 * thirdPi];
+function pointX(d) {
+  return d[0];
+}
+function pointY(d) {
+  return d[1];
+}
+function _default() {
+  var x0 = 0,
+    y0 = 0,
+    x1 = 1,
+    y1 = 1,
+    x = pointX,
+    y = pointY,
+    r,
+    dx,
+    dy;
+  function hexbin(points) {
+    var binsById = {},
+      bins = [],
+      i,
+      n = points.length;
+    for (i = 0; i < n; ++i) {
+      if (isNaN(px = +x.call(null, point = points[i], i, points)) || isNaN(py = +y.call(null, point, i, points))) continue;
+      var point,
+        px,
+        py,
+        pj = Math.round(py = py / dy),
+        pi = Math.round(px = px / dx - (pj & 1) / 2),
+        py1 = py - pj;
+      if (Math.abs(py1) * 3 > 1) {
+        var px1 = px - pi,
+          pi2 = pi + (px < pi ? -1 : 1) / 2,
+          pj2 = pj + (py < pj ? -1 : 1),
+          px2 = px - pi2,
+          py2 = py - pj2;
+        if (px1 * px1 + py1 * py1 > px2 * px2 + py2 * py2) pi = pi2 + (pj & 1 ? 1 : -1) / 2, pj = pj2;
+      }
+      var id = pi + "-" + pj,
+        bin = binsById[id];
+      if (bin) bin.push(point);else {
+        bins.push(bin = binsById[id] = [point]);
+        bin.x = (pi + (pj & 1) / 2) * dx;
+        bin.y = pj * dy;
+      }
+    }
+    return bins;
+  }
+  function hexagon(radius) {
+    var x0 = 0,
+      y0 = 0;
+    return angles.map(function (angle) {
+      var x1 = Math.sin(angle) * radius,
+        y1 = -Math.cos(angle) * radius,
+        dx = x1 - x0,
+        dy = y1 - y0;
+      x0 = x1, y0 = y1;
+      return [dx, dy];
+    });
+  }
+  hexbin.hexagon = function (radius) {
+    return "m" + hexagon(radius == null ? r : +radius).join("l") + "z";
+  };
+  hexbin.centers = function () {
+    var centers = [],
+      j = Math.round(y0 / dy),
+      i = Math.round(x0 / dx);
+    for (var y = j * dy; y < y1 + r; y += dy, ++j) {
+      for (var x = i * dx + (j & 1) * dx / 2; x < x1 + dx / 2; x += dx) {
+        centers.push([x, y]);
+      }
+    }
+    return centers;
+  };
+  hexbin.mesh = function () {
+    var fragment = hexagon(r).slice(0, 4).join("l");
+    return hexbin.centers().map(function (p) {
+      return "M" + p + "m" + fragment;
+    }).join("");
+  };
+  hexbin.x = function (_) {
+    return arguments.length ? (x = _, hexbin) : x;
+  };
+  hexbin.y = function (_) {
+    return arguments.length ? (y = _, hexbin) : y;
+  };
+  hexbin.radius = function (_) {
+    return arguments.length ? (r = +_, dx = r * 2 * Math.sin(thirdPi), dy = r * 1.5, hexbin) : r;
+  };
+  hexbin.size = function (_) {
+    return arguments.length ? (x0 = y0 = 0, x1 = +_[0], y1 = +_[1], hexbin) : [x1 - x0, y1 - y0];
+  };
+  hexbin.extent = function (_) {
+    return arguments.length ? (x0 = +_[0][0], y0 = +_[0][1], x1 = +_[1][0], y1 = +_[1][1], hexbin) : [[x0, y0], [x1, y1]];
+  };
+  return hexbin.radius(1);
+}
+},{}],"node_modules/d3-hexbin/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "hexbin", {
+  enumerable: true,
+  get: function () {
+    return _hexbin.default;
+  }
+});
+var _hexbin = _interopRequireDefault(require("./src/hexbin"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./src/hexbin":"node_modules/d3-hexbin/src/hexbin.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/hexagon-layer/hexagon-aggregator.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getPointsCenter = getPointsCenter;
+exports.getRadiusInCommon = getRadiusInCommon;
+exports.pointToHexbin = pointToHexbin;
+var _d3Hexbin = require("d3-hexbin");
+var _core = require("@deck.gl/core");
+function pointToHexbin(props, aggregationParams) {
+  const {
+    data,
+    radius
+  } = props;
+  const {
+    viewport,
+    attributes
+  } = aggregationParams;
+  const centerLngLat = data.length ? getPointsCenter(data, aggregationParams) : null;
+  const radiusCommon = getRadiusInCommon(radius, viewport, centerLngLat);
+  const screenPoints = [];
+  const {
+    iterable,
+    objectInfo
+  } = (0, _core.createIterable)(data);
+  const positions = attributes.positions.value;
+  const {
+    size
+  } = attributes.positions.getAccessor();
+  for (const object of iterable) {
+    objectInfo.index++;
+    const posIndex = objectInfo.index * size;
+    const position = [positions[posIndex], positions[posIndex + 1]];
+    const arrayIsFinite = Number.isFinite(position[0]) && Number.isFinite(position[1]);
+    if (arrayIsFinite) {
+      screenPoints.push({
+        screenCoord: viewport.projectFlat(position),
+        source: object,
+        index: objectInfo.index
+      });
+    } else {
+      _core.log.warn('HexagonLayer: invalid position')();
+    }
+  }
+  const newHexbin = (0, _d3Hexbin.hexbin)().radius(radiusCommon).x(d => d.screenCoord[0]).y(d => d.screenCoord[1]);
+  const hexagonBins = newHexbin(screenPoints);
+  return {
+    hexagons: hexagonBins.map((hex, index) => ({
+      position: viewport.unprojectFlat([hex.x, hex.y]),
+      points: hex,
+      index
+    })),
+    radiusCommon
+  };
+}
+function getPointsCenter(data, aggregationParams) {
+  const {
+    attributes
+  } = aggregationParams;
+  const positions = attributes.positions.value;
+  const {
+    size
+  } = attributes.positions.getAccessor();
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let i;
+  for (i = 0; i < size * data.length; i += size) {
+    const x = positions[i];
+    const y = positions[i + 1];
+    const arrayIsFinite = Number.isFinite(x) && Number.isFinite(y);
+    if (arrayIsFinite) {
+      minX = Math.min(x, minX);
+      maxX = Math.max(x, maxX);
+      minY = Math.min(y, minY);
+      maxY = Math.max(y, maxY);
+    }
+  }
+  return [minX, minY, maxX, maxY].every(Number.isFinite) ? [(minX + maxX) / 2, (minY + maxY) / 2] : null;
+}
+function getRadiusInCommon(radius, viewport, center) {
+  const {
+    unitsPerMeter
+  } = viewport.getDistanceScales(center);
+  return radius * unitsPerMeter[0];
+}
+},{"d3-hexbin":"node_modules/d3-hexbin/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/hexagon-layer/hexagon-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@deck.gl/core");
+var _layers = require("@deck.gl/layers");
+var _colorUtils = require("../utils/color-utils");
+var _hexagonAggregator = require("./hexagon-aggregator");
+var _cpuAggregator = _interopRequireDefault(require("../utils/cpu-aggregator"));
+var _aggregationLayer = _interopRequireDefault(require("../aggregation-layer"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+function nop() {}
+const defaultProps = {
+  colorDomain: null,
+  colorRange: _colorUtils.defaultColorRange,
+  getColorValue: {
+    type: 'accessor',
+    value: null
+  },
+  getColorWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  colorAggregation: 'SUM',
+  lowerPercentile: {
+    type: 'number',
+    value: 0,
+    min: 0,
+    max: 100
+  },
+  upperPercentile: {
+    type: 'number',
+    value: 100,
+    min: 0,
+    max: 100
+  },
+  colorScaleType: 'quantize',
+  onSetColorDomain: nop,
+  elevationDomain: null,
+  elevationRange: [0, 1000],
+  getElevationValue: {
+    type: 'accessor',
+    value: null
+  },
+  getElevationWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  elevationAggregation: 'SUM',
+  elevationLowerPercentile: {
+    type: 'number',
+    value: 0,
+    min: 0,
+    max: 100
+  },
+  elevationUpperPercentile: {
+    type: 'number',
+    value: 100,
+    min: 0,
+    max: 100
+  },
+  elevationScale: {
+    type: 'number',
+    min: 0,
+    value: 1
+  },
+  elevationScaleType: 'linear',
+  onSetElevationDomain: nop,
+  radius: {
+    type: 'number',
+    value: 1000,
+    min: 1
+  },
+  coverage: {
+    type: 'number',
+    min: 0,
+    max: 1,
+    value: 1
+  },
+  extruded: false,
+  hexagonAggregator: _hexagonAggregator.pointToHexbin,
+  getPosition: {
+    type: 'accessor',
+    value: x => x.position
+  },
+  material: true,
+  _filterData: {
+    type: 'function',
+    value: null,
+    optional: true
+  }
+};
+class HexagonLayer extends _aggregationLayer.default {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  initializeState() {
+    const cpuAggregator = new _cpuAggregator.default({
+      getAggregator: props => props.hexagonAggregator,
+      getCellSize: props => props.radius
+    });
+    this.state = {
+      cpuAggregator,
+      aggregatorState: cpuAggregator.state,
+      vertices: null
+    };
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      positions: {
+        size: 3,
+        type: 5130,
+        accessor: 'getPosition'
+      }
+    });
+  }
+  updateState(opts) {
+    super.updateState(opts);
+    if (opts.changeFlags.propsOrDataChanged) {
+      const aggregatorState = this.state.cpuAggregator.updateState(opts, {
+        viewport: this.context.viewport,
+        attributes: this.getAttributes()
+      });
+      if (this.state.aggregatorState.layerData !== aggregatorState.layerData) {
+        const {
+          hexagonVertices
+        } = aggregatorState.layerData || {};
+        this.setState({
+          vertices: hexagonVertices && this.convertLatLngToMeterOffset(hexagonVertices)
+        });
+      }
+      this.setState({
+        aggregatorState
+      });
+    }
+  }
+  convertLatLngToMeterOffset(hexagonVertices) {
+    const {
+      viewport
+    } = this.context;
+    if (Array.isArray(hexagonVertices) && hexagonVertices.length === 6) {
+      const vertex0 = hexagonVertices[0];
+      const vertex3 = hexagonVertices[3];
+      const centroid = [(vertex0[0] + vertex3[0]) / 2, (vertex0[1] + vertex3[1]) / 2];
+      const centroidFlat = viewport.projectFlat(centroid);
+      const {
+        metersPerUnit
+      } = viewport.getDistanceScales(centroid);
+      const vertices = hexagonVertices.map(vt => {
+        const vtFlat = viewport.projectFlat(vt);
+        return [(vtFlat[0] - centroidFlat[0]) * metersPerUnit[0], (vtFlat[1] - centroidFlat[1]) * metersPerUnit[1]];
+      });
+      return vertices;
+    }
+    _core.log.error('HexagonLayer: hexagonVertices needs to be an array of 6 points')();
+    return null;
+  }
+  getPickingInfo({
+    info
+  }) {
+    return this.state.cpuAggregator.getPickingInfo({
+      info
+    });
+  }
+  _onGetSublayerColor(cell) {
+    return this.state.cpuAggregator.getAccessor('fillColor')(cell);
+  }
+  _onGetSublayerElevation(cell) {
+    return this.state.cpuAggregator.getAccessor('elevation')(cell);
+  }
+  _getSublayerUpdateTriggers() {
+    return this.state.cpuAggregator.getUpdateTriggers(this.props);
+  }
+  renderLayers() {
+    const {
+      elevationScale,
+      extruded,
+      coverage,
+      material,
+      transitions
+    } = this.props;
+    const {
+      aggregatorState,
+      vertices
+    } = this.state;
+    const SubLayerClass = this.getSubLayerClass('hexagon-cell', _layers.ColumnLayer);
+    const updateTriggers = this._getSublayerUpdateTriggers();
+    const geometry = vertices ? {
+      vertices,
+      radius: 1
+    } : {
+      radius: aggregatorState.layerData.radiusCommon || 1,
+      radiusUnits: 'common',
+      angle: 90
+    };
+    return new SubLayerClass({
+      ...geometry,
+      diskResolution: 6,
+      elevationScale,
+      extruded,
+      coverage,
+      material,
+      getFillColor: this._onGetSublayerColor.bind(this),
+      getElevation: this._onGetSublayerElevation.bind(this),
+      transitions: transitions && {
+        getFillColor: transitions.getColorValue || transitions.getColorWeight,
+        getElevation: transitions.getElevationValue || transitions.getElevationWeight
+      }
+    }, this.getSubLayerProps({
+      id: 'hexagon-cell',
+      updateTriggers
+    }), {
+      data: aggregatorState.layerData.data
+    });
+  }
+}
+exports.default = HexagonLayer;
+(0, _defineProperty2.default)(HexagonLayer, "layerName", 'HexagonLayer');
+(0, _defineProperty2.default)(HexagonLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","../utils/color-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js","./hexagon-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/hexagon-layer/hexagon-aggregator.js","../utils/cpu-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/cpu-aggregator.js","../aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/aggregation-layer.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/marching-squares-codes.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.ISOLINES_CODE_OFFSET_MAP = exports.ISOBANDS_CODE_OFFSET_MAP = void 0;
+const HALF = 0.5;
+const ONE6TH = 1 / 6;
+const OFFSET = {
+  N: [0, HALF],
+  E: [HALF, 0],
+  S: [0, -HALF],
+  W: [-HALF, 0],
+  NE: [HALF, HALF],
+  NW: [-HALF, HALF],
+  SE: [HALF, -HALF],
+  SW: [-HALF, -HALF]
+};
+const SW_TRIANGLE = [OFFSET.W, OFFSET.SW, OFFSET.S];
+const SE_TRIANGLE = [OFFSET.S, OFFSET.SE, OFFSET.E];
+const NE_TRIANGLE = [OFFSET.E, OFFSET.NE, OFFSET.N];
+const NW_TRIANGLE = [OFFSET.NW, OFFSET.W, OFFSET.N];
+const SW_TRAPEZOID = [[-HALF, ONE6TH], [-HALF, -ONE6TH], [-ONE6TH, -HALF], [ONE6TH, -HALF]];
+const SE_TRAPEZOID = [[-ONE6TH, -HALF], [ONE6TH, -HALF], [HALF, -ONE6TH], [HALF, ONE6TH]];
+const NE_TRAPEZOID = [[HALF, -ONE6TH], [HALF, ONE6TH], [ONE6TH, HALF], [-ONE6TH, HALF]];
+const NW_TRAPEZOID = [[-HALF, ONE6TH], [-HALF, -ONE6TH], [ONE6TH, HALF], [-ONE6TH, HALF]];
+const S_RECTANGLE = [OFFSET.W, OFFSET.SW, OFFSET.SE, OFFSET.E];
+const E_RECTANGLE = [OFFSET.S, OFFSET.SE, OFFSET.NE, OFFSET.N];
+const N_RECTANGLE = [OFFSET.NW, OFFSET.W, OFFSET.E, OFFSET.NE];
+const W_RECTANGLE = [OFFSET.NW, OFFSET.SW, OFFSET.S, OFFSET.N];
+const EW_RECTANGEL = [[-HALF, ONE6TH], [-HALF, -ONE6TH], [HALF, -ONE6TH], [HALF, ONE6TH]];
+const SN_RECTANGEL = [[-ONE6TH, -HALF], [ONE6TH, -HALF], [ONE6TH, HALF], [-ONE6TH, HALF]];
+const SQUARE = [OFFSET.NW, OFFSET.SW, OFFSET.SE, OFFSET.NE];
+const SW_PENTAGON = [OFFSET.NW, OFFSET.SW, OFFSET.SE, OFFSET.E, OFFSET.N];
+const SE_PENTAGON = [OFFSET.W, OFFSET.SW, OFFSET.SE, OFFSET.NE, OFFSET.N];
+const NE_PENTAGON = [OFFSET.NW, OFFSET.W, OFFSET.S, OFFSET.SE, OFFSET.NE];
+const NW_PENTAGON = [OFFSET.NW, OFFSET.SW, OFFSET.S, OFFSET.E, OFFSET.NE];
+const NW_N_PENTAGON = [OFFSET.NW, OFFSET.W, [HALF, -ONE6TH], [HALF, ONE6TH], OFFSET.N];
+const NE_E_PENTAGON = [[-ONE6TH, -HALF], [ONE6TH, -HALF], OFFSET.E, OFFSET.NE, OFFSET.N];
+const SE_S_PENTAGON = [[-HALF, ONE6TH], [-HALF, -ONE6TH], OFFSET.S, OFFSET.SE, OFFSET.E];
+const SW_W_PENTAGON = [OFFSET.W, OFFSET.SW, OFFSET.S, [ONE6TH, HALF], [-ONE6TH, HALF]];
+const NW_W_PENTAGON = [OFFSET.NW, OFFSET.W, [-ONE6TH, -HALF], [ONE6TH, -HALF], OFFSET.N];
+const NE_N_PENTAGON = [[-HALF, ONE6TH], [-HALF, -ONE6TH], OFFSET.E, OFFSET.NE, OFFSET.N];
+const SE_E_PENTAGON = [OFFSET.S, OFFSET.SE, OFFSET.E, [ONE6TH, HALF], [-ONE6TH, HALF]];
+const SW_S_PENTAGON = [OFFSET.W, OFFSET.SW, OFFSET.S, [HALF, -ONE6TH], [HALF, ONE6TH]];
+const S_HEXAGON = [OFFSET.W, OFFSET.SW, OFFSET.SE, OFFSET.E, [ONE6TH, HALF], [-ONE6TH, HALF]];
+const E_HEXAGON = [[-HALF, ONE6TH], [-HALF, -ONE6TH], OFFSET.S, OFFSET.SE, OFFSET.NE, OFFSET.N];
+const N_HEXAGON = [OFFSET.NW, OFFSET.W, [-ONE6TH, -HALF], [ONE6TH, -HALF], OFFSET.E, OFFSET.NE];
+const W_HEXAGON = [OFFSET.NW, OFFSET.SW, OFFSET.S, [HALF, -ONE6TH], [HALF, ONE6TH], OFFSET.N];
+const SW_NE_HEXAGON = [OFFSET.W, OFFSET.SW, OFFSET.S, OFFSET.E, OFFSET.NE, OFFSET.N];
+const NW_SE_HEXAGON = [OFFSET.NW, OFFSET.W, OFFSET.S, OFFSET.SE, OFFSET.E, OFFSET.N];
+const NE_HEPTAGON = [[-HALF, ONE6TH], [-HALF, -ONE6TH], [-ONE6TH, -HALF], [ONE6TH, -HALF], OFFSET.E, OFFSET.NE, OFFSET.N];
+const SW_HEPTAGON = [OFFSET.W, OFFSET.SW, OFFSET.S, [HALF, -ONE6TH], [HALF, ONE6TH], [ONE6TH, HALF], [-ONE6TH, HALF]];
+const NW_HEPTAGON = [OFFSET.NW, OFFSET.W, [-ONE6TH, -HALF], [ONE6TH, -HALF], [HALF, -ONE6TH], [HALF, ONE6TH], OFFSET.N];
+const SE_HEPTAGON = [[-HALF, ONE6TH], [-HALF, -ONE6TH], OFFSET.S, OFFSET.SE, OFFSET.E, [ONE6TH, HALF], [-ONE6TH, HALF]];
+const OCTAGON = [[-HALF, ONE6TH], [-HALF, -ONE6TH], [-ONE6TH, -HALF], [ONE6TH, -HALF], [HALF, -ONE6TH], [HALF, ONE6TH], [ONE6TH, HALF], [-ONE6TH, HALF]];
+const ISOLINES_CODE_OFFSET_MAP = {
+  0: [],
+  1: [[OFFSET.W, OFFSET.S]],
+  2: [[OFFSET.S, OFFSET.E]],
+  3: [[OFFSET.W, OFFSET.E]],
+  4: [[OFFSET.N, OFFSET.E]],
+  5: {
+    0: [[OFFSET.W, OFFSET.S], [OFFSET.N, OFFSET.E]],
+    1: [[OFFSET.W, OFFSET.N], [OFFSET.S, OFFSET.E]]
+  },
+  6: [[OFFSET.N, OFFSET.S]],
+  7: [[OFFSET.W, OFFSET.N]],
+  8: [[OFFSET.W, OFFSET.N]],
+  9: [[OFFSET.N, OFFSET.S]],
+  10: {
+    0: [[OFFSET.W, OFFSET.N], [OFFSET.S, OFFSET.E]],
+    1: [[OFFSET.W, OFFSET.S], [OFFSET.N, OFFSET.E]]
+  },
+  11: [[OFFSET.N, OFFSET.E]],
+  12: [[OFFSET.W, OFFSET.E]],
+  13: [[OFFSET.S, OFFSET.E]],
+  14: [[OFFSET.W, OFFSET.S]],
+  15: []
+};
+exports.ISOLINES_CODE_OFFSET_MAP = ISOLINES_CODE_OFFSET_MAP;
+function ternaryToIndex(ternary) {
+  return parseInt(ternary, 4);
+}
+const ISOBANDS_CODE_OFFSET_MAP = {
+  [ternaryToIndex('0000')]: [],
+  [ternaryToIndex('2222')]: [],
+  [ternaryToIndex('2221')]: [SW_TRIANGLE],
+  [ternaryToIndex('2212')]: [SE_TRIANGLE],
+  [ternaryToIndex('2122')]: [NE_TRIANGLE],
+  [ternaryToIndex('1222')]: [NW_TRIANGLE],
+  [ternaryToIndex('0001')]: [SW_TRIANGLE],
+  [ternaryToIndex('0010')]: [SE_TRIANGLE],
+  [ternaryToIndex('0100')]: [NE_TRIANGLE],
+  [ternaryToIndex('1000')]: [NW_TRIANGLE],
+  [ternaryToIndex('2220')]: [SW_TRAPEZOID],
+  [ternaryToIndex('2202')]: [SE_TRAPEZOID],
+  [ternaryToIndex('2022')]: [NE_TRAPEZOID],
+  [ternaryToIndex('0222')]: [NW_TRAPEZOID],
+  [ternaryToIndex('0002')]: [SW_TRAPEZOID],
+  [ternaryToIndex('0020')]: [SE_TRAPEZOID],
+  [ternaryToIndex('0200')]: [NE_TRAPEZOID],
+  [ternaryToIndex('2000')]: [NW_TRAPEZOID],
+  [ternaryToIndex('0011')]: [S_RECTANGLE],
+  [ternaryToIndex('0110')]: [E_RECTANGLE],
+  [ternaryToIndex('1100')]: [N_RECTANGLE],
+  [ternaryToIndex('1001')]: [W_RECTANGLE],
+  [ternaryToIndex('2211')]: [S_RECTANGLE],
+  [ternaryToIndex('2112')]: [E_RECTANGLE],
+  [ternaryToIndex('1122')]: [N_RECTANGLE],
+  [ternaryToIndex('1221')]: [W_RECTANGLE],
+  [ternaryToIndex('2200')]: [EW_RECTANGEL],
+  [ternaryToIndex('2002')]: [SN_RECTANGEL],
+  [ternaryToIndex('0022')]: [EW_RECTANGEL],
+  [ternaryToIndex('0220')]: [SN_RECTANGEL],
+  [ternaryToIndex('1111')]: [SQUARE],
+  [ternaryToIndex('1211')]: [SW_PENTAGON],
+  [ternaryToIndex('2111')]: [SE_PENTAGON],
+  [ternaryToIndex('1112')]: [NE_PENTAGON],
+  [ternaryToIndex('1121')]: [NW_PENTAGON],
+  [ternaryToIndex('1011')]: [SW_PENTAGON],
+  [ternaryToIndex('0111')]: [SE_PENTAGON],
+  [ternaryToIndex('1110')]: [NE_PENTAGON],
+  [ternaryToIndex('1101')]: [NW_PENTAGON],
+  [ternaryToIndex('1200')]: [NW_N_PENTAGON],
+  [ternaryToIndex('0120')]: [NE_E_PENTAGON],
+  [ternaryToIndex('0012')]: [SE_S_PENTAGON],
+  [ternaryToIndex('2001')]: [SW_W_PENTAGON],
+  [ternaryToIndex('1022')]: [NW_N_PENTAGON],
+  [ternaryToIndex('2102')]: [NE_E_PENTAGON],
+  [ternaryToIndex('2210')]: [SE_S_PENTAGON],
+  [ternaryToIndex('0221')]: [SW_W_PENTAGON],
+  [ternaryToIndex('1002')]: [NW_W_PENTAGON],
+  [ternaryToIndex('2100')]: [NE_N_PENTAGON],
+  [ternaryToIndex('0210')]: [SE_E_PENTAGON],
+  [ternaryToIndex('0021')]: [SW_S_PENTAGON],
+  [ternaryToIndex('1220')]: [NW_W_PENTAGON],
+  [ternaryToIndex('0122')]: [NE_N_PENTAGON],
+  [ternaryToIndex('2012')]: [SE_E_PENTAGON],
+  [ternaryToIndex('2201')]: [SW_S_PENTAGON],
+  [ternaryToIndex('0211')]: [S_HEXAGON],
+  [ternaryToIndex('2110')]: [E_HEXAGON],
+  [ternaryToIndex('1102')]: [N_HEXAGON],
+  [ternaryToIndex('1021')]: [W_HEXAGON],
+  [ternaryToIndex('2011')]: [S_HEXAGON],
+  [ternaryToIndex('0112')]: [E_HEXAGON],
+  [ternaryToIndex('1120')]: [N_HEXAGON],
+  [ternaryToIndex('1201')]: [W_HEXAGON],
+  [ternaryToIndex('2101')]: [SW_NE_HEXAGON],
+  [ternaryToIndex('0121')]: [SW_NE_HEXAGON],
+  [ternaryToIndex('1012')]: [NW_SE_HEXAGON],
+  [ternaryToIndex('1210')]: [NW_SE_HEXAGON],
+  [ternaryToIndex('0101')]: {
+    0: [SW_TRIANGLE, NE_TRIANGLE],
+    1: [SW_NE_HEXAGON],
+    2: [SW_NE_HEXAGON]
+  },
+  [ternaryToIndex('1010')]: {
+    0: [NW_TRIANGLE, SE_TRIANGLE],
+    1: [NW_SE_HEXAGON],
+    2: [NW_SE_HEXAGON]
+  },
+  [ternaryToIndex('2121')]: {
+    0: [SW_NE_HEXAGON],
+    1: [SW_NE_HEXAGON],
+    2: [SW_TRIANGLE, NE_TRIANGLE]
+  },
+  [ternaryToIndex('1212')]: {
+    0: [NW_SE_HEXAGON],
+    1: [NW_SE_HEXAGON],
+    2: [NW_TRIANGLE, SE_TRIANGLE]
+  },
+  [ternaryToIndex('2120')]: {
+    0: [NE_HEPTAGON],
+    1: [NE_HEPTAGON],
+    2: [SW_TRAPEZOID, NE_TRIANGLE]
+  },
+  [ternaryToIndex('2021')]: {
+    0: [SW_HEPTAGON],
+    1: [SW_HEPTAGON],
+    2: [SW_TRIANGLE, NE_TRAPEZOID]
+  },
+  [ternaryToIndex('1202')]: {
+    0: [NW_HEPTAGON],
+    1: [NW_HEPTAGON],
+    2: [NW_TRIANGLE, SE_TRAPEZOID]
+  },
+  [ternaryToIndex('0212')]: {
+    0: [SE_HEPTAGON],
+    1: [SE_HEPTAGON],
+    2: [SE_TRIANGLE, NW_TRAPEZOID]
+  },
+  [ternaryToIndex('0102')]: {
+    0: [SW_TRAPEZOID, NE_TRIANGLE],
+    1: [NE_HEPTAGON],
+    2: [NE_HEPTAGON]
+  },
+  [ternaryToIndex('0201')]: {
+    0: [SW_TRIANGLE, NE_TRAPEZOID],
+    1: [SW_HEPTAGON],
+    2: [SW_HEPTAGON]
+  },
+  [ternaryToIndex('1020')]: {
+    0: [NW_TRIANGLE, SE_TRAPEZOID],
+    1: [NW_HEPTAGON],
+    2: [NW_HEPTAGON]
+  },
+  [ternaryToIndex('2010')]: {
+    0: [SE_TRIANGLE, NW_TRAPEZOID],
+    1: [SE_HEPTAGON],
+    2: [SE_HEPTAGON]
+  },
+  [ternaryToIndex('2020')]: {
+    0: [NW_TRAPEZOID, SE_TRAPEZOID],
+    1: [OCTAGON],
+    2: [SW_TRAPEZOID, NE_TRAPEZOID]
+  },
+  [ternaryToIndex('0202')]: {
+    0: [NE_TRAPEZOID, SW_TRAPEZOID],
+    1: [OCTAGON],
+    2: [NW_TRAPEZOID, SE_TRAPEZOID]
+  }
+};
+exports.ISOBANDS_CODE_OFFSET_MAP = ISOBANDS_CODE_OFFSET_MAP;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/marching-squares.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.CONTOUR_TYPE = void 0;
+exports.getCode = getCode;
+exports.getVertices = getVertices;
+var _core = require("@deck.gl/core");
+var _marchingSquaresCodes = require("./marching-squares-codes");
+const CONTOUR_TYPE = {
+  ISO_LINES: 1,
+  ISO_BANDS: 2
+};
+exports.CONTOUR_TYPE = CONTOUR_TYPE;
+const DEFAULT_THRESHOLD_DATA = {
+  zIndex: 0,
+  zOffset: 0.005
+};
+function getVertexCode(weight, threshold) {
+  if (Array.isArray(threshold)) {
+    if (weight < threshold[0]) {
+      return 0;
+    }
+    return weight < threshold[1] ? 1 : 2;
+  }
+  return weight >= threshold ? 1 : 0;
+}
+function getCode(opts) {
+  const {
+    cellWeights,
+    x,
+    y,
+    width,
+    height
+  } = opts;
+  let threshold = opts.threshold;
+  if (opts.thresholdValue) {
+    _core.log.deprecated('thresholdValue', 'threshold')();
+    threshold = opts.thresholdValue;
+  }
+  const isLeftBoundary = x < 0;
+  const isRightBoundary = x >= width - 1;
+  const isBottomBoundary = y < 0;
+  const isTopBoundary = y >= height - 1;
+  const isBoundary = isLeftBoundary || isRightBoundary || isBottomBoundary || isTopBoundary;
+  const weights = {};
+  const codes = {};
+  if (isLeftBoundary || isTopBoundary) {
+    codes.top = 0;
+  } else {
+    weights.top = cellWeights[(y + 1) * width + x];
+    codes.top = getVertexCode(weights.top, threshold);
+  }
+  if (isRightBoundary || isTopBoundary) {
+    codes.topRight = 0;
+  } else {
+    weights.topRight = cellWeights[(y + 1) * width + x + 1];
+    codes.topRight = getVertexCode(weights.topRight, threshold);
+  }
+  if (isRightBoundary || isBottomBoundary) {
+    codes.right = 0;
+  } else {
+    weights.right = cellWeights[y * width + x + 1];
+    codes.right = getVertexCode(weights.right, threshold);
+  }
+  if (isLeftBoundary || isBottomBoundary) {
+    codes.current = 0;
+  } else {
+    weights.current = cellWeights[y * width + x];
+    codes.current = getVertexCode(weights.current, threshold);
+  }
+  const {
+    top,
+    topRight,
+    right,
+    current
+  } = codes;
+  let code = -1;
+  if (Number.isFinite(threshold)) {
+    code = top << 3 | topRight << 2 | right << 1 | current;
+  }
+  if (Array.isArray(threshold)) {
+    code = top << 6 | topRight << 4 | right << 2 | current;
+  }
+  let meanCode = 0;
+  if (!isBoundary) {
+    meanCode = getVertexCode((weights.top + weights.topRight + weights.right + weights.current) / 4, threshold);
+  }
+  return {
+    code,
+    meanCode
+  };
+}
+function getVertices(opts) {
+  const {
+    gridOrigin,
+    cellSize,
+    x,
+    y,
+    code,
+    meanCode,
+    type = CONTOUR_TYPE.ISO_LINES
+  } = opts;
+  const thresholdData = {
+    ...DEFAULT_THRESHOLD_DATA,
+    ...opts.thresholdData
+  };
+  let offsets = type === CONTOUR_TYPE.ISO_BANDS ? _marchingSquaresCodes.ISOBANDS_CODE_OFFSET_MAP[code] : _marchingSquaresCodes.ISOLINES_CODE_OFFSET_MAP[code];
+  if (!Array.isArray(offsets)) {
+    offsets = offsets[meanCode];
+  }
+  const vZ = thresholdData.zIndex * thresholdData.zOffset;
+  const rX = (x + 1) * cellSize[0];
+  const rY = (y + 1) * cellSize[1];
+  const refVertexX = gridOrigin[0] + rX;
+  const refVertexY = gridOrigin[1] + rY;
+  if (type === CONTOUR_TYPE.ISO_BANDS) {
+    const polygons = [];
+    offsets.forEach(polygonOffsets => {
+      const polygon = [];
+      polygonOffsets.forEach(xyOffset => {
+        const vX = refVertexX + xyOffset[0] * cellSize[0];
+        const vY = refVertexY + xyOffset[1] * cellSize[1];
+        polygon.push([vX, vY, vZ]);
+      });
+      polygons.push(polygon);
+    });
+    return polygons;
+  }
+  const lines = [];
+  offsets.forEach(xyOffsets => {
+    xyOffsets.forEach(offset => {
+      const vX = refVertexX + offset[0] * cellSize[0];
+      const vY = refVertexY + offset[1] * cellSize[1];
+      lines.push([vX, vY, vZ]);
+    });
+  });
+  return lines;
+}
+},{"@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","./marching-squares-codes":"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/marching-squares-codes.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/contour-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.generateContours = generateContours;
+var _marchingSquares = require("./marching-squares");
+function generateContours({
+  thresholdData,
+  cellWeights,
+  gridSize,
+  gridOrigin,
+  cellSize
+}) {
+  const contourSegments = [];
+  const contourPolygons = [];
+  const width = gridSize[0];
+  const height = gridSize[1];
+  let segmentIndex = 0;
+  let polygonIndex = 0;
+  for (const data of thresholdData) {
+    const {
+      contour
+    } = data;
+    const {
+      threshold
+    } = contour;
+    for (let x = -1; x < width; x++) {
+      for (let y = -1; y < height; y++) {
+        const {
+          code,
+          meanCode
+        } = (0, _marchingSquares.getCode)({
+          cellWeights,
+          threshold,
+          x,
+          y,
+          width,
+          height
+        });
+        const opts = {
+          type: _marchingSquares.CONTOUR_TYPE.ISO_BANDS,
+          gridOrigin,
+          cellSize,
+          x,
+          y,
+          width,
+          height,
+          code,
+          meanCode,
+          thresholdData: data
+        };
+        if (Array.isArray(threshold)) {
+          opts.type = _marchingSquares.CONTOUR_TYPE.ISO_BANDS;
+          const polygons = (0, _marchingSquares.getVertices)(opts);
+          for (const polygon of polygons) {
+            contourPolygons[polygonIndex++] = {
+              vertices: polygon,
+              contour
+            };
+          }
+        } else {
+          opts.type = _marchingSquares.CONTOUR_TYPE.ISO_LINES;
+          const vertices = (0, _marchingSquares.getVertices)(opts);
+          for (let i = 0; i < vertices.length; i += 2) {
+            contourSegments[segmentIndex++] = {
+              start: vertices[i],
+              end: vertices[i + 1],
+              contour
+            };
+          }
+        }
+      }
+    }
+  }
+  return {
+    contourSegments,
+    contourPolygons
+  };
+}
+},{"./marching-squares":"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/marching-squares.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/contour-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _layers = require("@deck.gl/layers");
+var _contourUtils = require("./contour-utils");
+var _core = require("@deck.gl/core");
+var _gpuGridAggregator = _interopRequireDefault(require("../utils/gpu-grid-aggregation/gpu-grid-aggregator"));
+var _aggregationOperationUtils = require("../utils/aggregation-operation-utils");
+var _gridAggregationUtils = require("../utils/grid-aggregation-utils");
+var _gridAggregationLayer = _interopRequireDefault(require("../grid-aggregation-layer"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const DEFAULT_COLOR = [255, 255, 255, 255];
+const DEFAULT_STROKE_WIDTH = 1;
+const DEFAULT_THRESHOLD = 1;
+const defaultProps = {
+  cellSize: {
+    type: 'number',
+    min: 1,
+    max: 1000,
+    value: 1000
+  },
+  getPosition: {
+    type: 'accessor',
+    value: x => x.position
+  },
+  getWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  gpuAggregation: true,
+  aggregation: 'SUM',
+  contours: {
+    type: 'object',
+    value: [{
+      threshold: DEFAULT_THRESHOLD
+    }],
+    optional: true,
+    compare: 3
+  },
+  zOffset: 0.005
+};
+const POSITION_ATTRIBUTE_NAME = 'positions';
+const DIMENSIONS = {
+  data: {
+    props: ['cellSize']
+  },
+  weights: {
+    props: ['aggregation'],
+    accessors: ['getWeight']
+  }
+};
+class ContourLayer extends _gridAggregationLayer.default {
+  initializeState() {
+    super.initializeAggregationLayer({
+      dimensions: DIMENSIONS
+    });
+    this.setState({
+      contourData: {},
+      projectPoints: false,
+      weights: {
+        count: {
+          size: 1,
+          operation: _aggregationOperationUtils.AGGREGATION_OPERATION.SUM
+        }
+      }
+    });
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      [POSITION_ATTRIBUTE_NAME]: {
+        size: 3,
+        accessor: 'getPosition',
+        type: 5130,
+        fp64: this.use64bitPositions()
+      },
+      count: {
+        size: 3,
+        accessor: 'getWeight'
+      }
+    });
+  }
+  updateState(opts) {
+    super.updateState(opts);
+    let contoursChanged = false;
+    const {
+      oldProps,
+      props
+    } = opts;
+    const {
+      aggregationDirty
+    } = this.state;
+    if (oldProps.contours !== props.contours || oldProps.zOffset !== props.zOffset) {
+      contoursChanged = true;
+      this._updateThresholdData(opts.props);
+    }
+    if (this.getNumInstances() > 0 && (aggregationDirty || contoursChanged)) {
+      this._generateContours();
+    }
+  }
+  renderLayers() {
+    const {
+      contourSegments,
+      contourPolygons
+    } = this.state.contourData;
+    const LinesSubLayerClass = this.getSubLayerClass('lines', _layers.LineLayer);
+    const BandsSubLayerClass = this.getSubLayerClass('bands', _layers.SolidPolygonLayer);
+    const lineLayer = contourSegments && contourSegments.length > 0 && new LinesSubLayerClass(this.getSubLayerProps({
+      id: 'lines'
+    }), {
+      data: this.state.contourData.contourSegments,
+      getSourcePosition: d => d.start,
+      getTargetPosition: d => d.end,
+      getColor: d => d.contour.color || DEFAULT_COLOR,
+      getWidth: d => d.contour.strokeWidth || DEFAULT_STROKE_WIDTH
+    });
+    const bandsLayer = contourPolygons && contourPolygons.length > 0 && new BandsSubLayerClass(this.getSubLayerProps({
+      id: 'bands'
+    }), {
+      data: this.state.contourData.contourPolygons,
+      getPolygon: d => d.vertices,
+      getFillColor: d => d.contour.color || DEFAULT_COLOR
+    });
+    return [lineLayer, bandsLayer];
+  }
+  updateAggregationState(opts) {
+    const {
+      props,
+      oldProps
+    } = opts;
+    const {
+      cellSize,
+      coordinateSystem
+    } = props;
+    const {
+      viewport
+    } = this.context;
+    const cellSizeChanged = oldProps.cellSize !== cellSize;
+    let gpuAggregation = props.gpuAggregation;
+    if (this.state.gpuAggregation !== props.gpuAggregation) {
+      if (gpuAggregation && !_gpuGridAggregator.default.isSupported(this.context.gl)) {
+        _core.log.warn('GPU Grid Aggregation not supported, falling back to CPU')();
+        gpuAggregation = false;
+      }
+    }
+    const gpuAggregationChanged = gpuAggregation !== this.state.gpuAggregation;
+    this.setState({
+      gpuAggregation
+    });
+    const {
+      dimensions
+    } = this.state;
+    const positionsChanged = this.isAttributeChanged(POSITION_ATTRIBUTE_NAME);
+    const {
+      data,
+      weights
+    } = dimensions;
+    let {
+      boundingBox
+    } = this.state;
+    if (positionsChanged) {
+      boundingBox = (0, _gridAggregationUtils.getBoundingBox)(this.getAttributes(), this.getNumInstances());
+      this.setState({
+        boundingBox
+      });
+    }
+    if (positionsChanged || cellSizeChanged) {
+      const {
+        gridOffset,
+        translation,
+        width,
+        height,
+        numCol,
+        numRow
+      } = (0, _gridAggregationUtils.getGridParams)(boundingBox, cellSize, viewport, coordinateSystem);
+      this.allocateResources(numRow, numCol);
+      this.setState({
+        gridOffset,
+        boundingBox,
+        translation,
+        posOffset: translation.slice(),
+        gridOrigin: [-1 * translation[0], -1 * translation[1]],
+        width,
+        height,
+        numCol,
+        numRow
+      });
+    }
+    const aggregationDataDirty = positionsChanged || gpuAggregationChanged || this.isAggregationDirty(opts, {
+      dimension: data,
+      compareAll: gpuAggregation
+    });
+    const aggregationWeightsDirty = this.isAggregationDirty(opts, {
+      dimension: weights
+    });
+    if (aggregationWeightsDirty) {
+      this._updateAccessors(opts);
+    }
+    if (aggregationDataDirty || aggregationWeightsDirty) {
+      this._resetResults();
+    }
+    this.setState({
+      aggregationDataDirty,
+      aggregationWeightsDirty
+    });
+  }
+  _updateAccessors(opts) {
+    const {
+      getWeight,
+      aggregation,
+      data
+    } = opts.props;
+    const {
+      count
+    } = this.state.weights;
+    if (count) {
+      count.getWeight = getWeight;
+      count.operation = _aggregationOperationUtils.AGGREGATION_OPERATION[aggregation];
+    }
+    this.setState({
+      getValue: (0, _aggregationOperationUtils.getValueFunc)(aggregation, getWeight, {
+        data
+      })
+    });
+  }
+  _resetResults() {
+    const {
+      count
+    } = this.state.weights;
+    if (count) {
+      count.aggregationData = null;
+    }
+  }
+  _generateContours() {
+    const {
+      numCol,
+      numRow,
+      gridOrigin,
+      gridOffset,
+      thresholdData
+    } = this.state;
+    const {
+      count
+    } = this.state.weights;
+    let {
+      aggregationData
+    } = count;
+    if (!aggregationData) {
+      aggregationData = count.aggregationBuffer.getData();
+      count.aggregationData = aggregationData;
+    }
+    const {
+      cellWeights
+    } = _gpuGridAggregator.default.getCellData({
+      countsData: aggregationData
+    });
+    const contourData = (0, _contourUtils.generateContours)({
+      thresholdData,
+      cellWeights,
+      gridSize: [numCol, numRow],
+      gridOrigin,
+      cellSize: [gridOffset.xOffset, gridOffset.yOffset]
+    });
+    this.setState({
+      contourData
+    });
+  }
+  _updateThresholdData(props) {
+    const {
+      contours,
+      zOffset
+    } = props;
+    const count = contours.length;
+    const thresholdData = new Array(count);
+    for (let i = 0; i < count; i++) {
+      const contour = contours[i];
+      thresholdData[i] = {
+        contour,
+        zIndex: contour.zIndex || i,
+        zOffset
+      };
+    }
+    this.setState({
+      thresholdData
+    });
+  }
+}
+exports.default = ContourLayer;
+(0, _defineProperty2.default)(ContourLayer, "layerName", 'ContourLayer');
+(0, _defineProperty2.default)(ContourLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","./contour-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/contour-utils.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","../utils/gpu-grid-aggregation/gpu-grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js","../utils/aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js","../utils/grid-aggregation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/grid-aggregation-utils.js","../grid-aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/grid-aggregation-layer.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-cell-layer-vertex.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#version 300 es\n#define SHADER_NAME gpu-grid-cell-layer-vertex-shader\n#define RANGE_COUNT 6\n\nin vec3 positions;\nin vec3 normals;\n\nin vec4 colors;\nin vec4 elevations;\nin vec3 instancePickingColors;\nuniform vec2 offset;\nuniform bool extruded;\nuniform float cellSize;\nuniform float coverage;\nuniform float opacity;\nuniform float elevationScale;\n\nuniform ivec2 gridSize;\nuniform vec2 gridOrigin;\nuniform vec2 gridOriginLow;\nuniform vec2 gridOffset;\nuniform vec2 gridOffsetLow;\nuniform vec4 colorRange[RANGE_COUNT];\nuniform vec2 elevationRange;\nuniform vec2 colorDomain;\nuniform bool colorDomainValid;\nuniform vec2 elevationDomain;\nuniform bool elevationDomainValid;\n\nlayout(std140) uniform;\nuniform ColorData\n{\n  vec4 maxMinCount;\n} colorData;\nuniform ElevationData\n{\n  vec4 maxMinCount;\n} elevationData;\n\n#define EPSILON 0.00001\nout vec4 vColor;\n\nvec4 quantizeScale(vec2 domain, vec4 range[RANGE_COUNT], float value) {\n  vec4 outColor = vec4(0., 0., 0., 0.);\n  if (value >= (domain.x - EPSILON) && value <= (domain.y + EPSILON)) {\n    float domainRange = domain.y - domain.x;\n    if (domainRange <= 0.) {\n      outColor = colorRange[0];\n    } else {\n      float rangeCount = float(RANGE_COUNT);\n      float rangeStep = domainRange / rangeCount;\n      float idx = floor((value - domain.x) / rangeStep);\n      idx = clamp(idx, 0., rangeCount - 1.);\n      int intIdx = int(idx);\n      outColor = colorRange[intIdx];\n    }\n  }\n  return outColor;\n}\n\nfloat linearScale(vec2 domain, vec2 range, float value) {\n  if (value >= (domain.x - EPSILON) && value <= (domain.y + EPSILON)) {\n    return ((value - domain.x) / (domain.y - domain.x)) * (range.y - range.x) + range.x;\n  }\n  return -1.;\n}\n\nvoid main(void) {\n  vec2 clrDomain = colorDomainValid ? colorDomain : vec2(colorData.maxMinCount.a, colorData.maxMinCount.r);\n  vec4 color = quantizeScale(clrDomain, colorRange, colors.r);\n\n  float elevation = 0.0;\n\n  if (extruded) {\n    vec2 elvDomain = elevationDomainValid ? elevationDomain : vec2(elevationData.maxMinCount.a, elevationData.maxMinCount.r);\n    elevation = linearScale(elvDomain, elevationRange, elevations.r);\n    elevation = elevation  * (positions.z + 1.0) / 2.0 * elevationScale;\n  }\n  float shouldRender = float(color.r > 0.0 && elevations.r >= 0.0);\n  float dotRadius = cellSize / 2. * coverage * shouldRender;\n\n  int yIndex = (gl_InstanceID / gridSize[0]);\n  int xIndex = gl_InstanceID - (yIndex * gridSize[0]);\n\n  vec2 instancePositionXFP64 = mul_fp64(vec2(gridOffset[0], gridOffsetLow[0]), vec2(float(xIndex), 0.));\n  instancePositionXFP64 = sum_fp64(instancePositionXFP64, vec2(gridOrigin[0], gridOriginLow[0]));\n  vec2 instancePositionYFP64 = mul_fp64(vec2(gridOffset[1], gridOffsetLow[1]), vec2(float(yIndex), 0.));\n  instancePositionYFP64 = sum_fp64(instancePositionYFP64, vec2(gridOrigin[1], gridOriginLow[1]));\n\n  vec3 centroidPosition = vec3(instancePositionXFP64[0], instancePositionYFP64[0], elevation);\n  vec3 centroidPosition64Low = vec3(instancePositionXFP64[1], instancePositionYFP64[1], 0.0);\n  geometry.worldPosition = centroidPosition;\n  vec3 pos = vec3(project_size(positions.xy + offset) * dotRadius, 0.);\n  picking_setPickingColor(instancePickingColors);\n\n  gl_Position = project_position_to_clipspace(centroidPosition, centroidPosition64Low, pos, geometry.position);\n\n  vec3 normals_commonspace = project_normal(normals);\n\n   if (extruded) {\n    vec3 lightColor = lighting_getLightColor(color.rgb, project_uCameraPosition, geometry.position.xyz, normals_commonspace);\n    vColor = vec4(lightColor, color.a * opacity) / 255.;\n  } else {\n    vColor = vec4(color.rgb, color.a * opacity) / 255.;\n  }\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-cell-layer-fragment.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#version 300 es\n#define SHADER_NAME gpu-grid-cell-layer-fragment-shader\n\nprecision highp float;\n\nin vec4 vColor;\n\nout vec4 fragColor;\n\nvoid main(void) {\n  fragColor = vColor;\n  fragColor = picking_filterColor(fragColor);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-cell-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@deck.gl/core");
+var _core2 = require("@luma.gl/core");
+var _shadertools = require("@luma.gl/shadertools");
+var _colorUtils = require("../utils/color-utils");
+var _gpuGridCellLayerVertex = _interopRequireDefault(require("./gpu-grid-cell-layer-vertex.glsl"));
+var _gpuGridCellLayerFragment = _interopRequireDefault(require("./gpu-grid-cell-layer-fragment.glsl"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const COLOR_DATA_UBO_INDEX = 0;
+const ELEVATION_DATA_UBO_INDEX = 1;
+const defaultProps = {
+  colorDomain: null,
+  colorRange: _colorUtils.defaultColorRange,
+  elevationDomain: null,
+  elevationRange: [0, 1000],
+  elevationScale: {
+    type: 'number',
+    min: 0,
+    value: 1
+  },
+  gridSize: {
+    type: 'array',
+    value: [1, 1]
+  },
+  gridOrigin: {
+    type: 'array',
+    value: [0, 0]
+  },
+  gridOffset: {
+    type: 'array',
+    value: [0, 0]
+  },
+  cellSize: {
+    type: 'number',
+    min: 0,
+    max: 1000,
+    value: 1000
+  },
+  offset: {
+    type: 'array',
+    value: [1, 1]
+  },
+  coverage: {
+    type: 'number',
+    min: 0,
+    max: 1,
+    value: 1
+  },
+  extruded: true,
+  material: true
+};
+class GPUGridCellLayer extends _core.Layer {
+  getShaders() {
+    return super.getShaders({
+      vs: _gpuGridCellLayerVertex.default,
+      fs: _gpuGridCellLayerFragment.default,
+      modules: [_core.project32, _core.gouraudLighting, _core.picking, _shadertools.fp64arithmetic]
+    });
+  }
+  initializeState({
+    gl
+  }) {
+    const attributeManager = this.getAttributeManager();
+    attributeManager.addInstanced({
+      colors: {
+        size: 4,
+        noAlloc: true
+      },
+      elevations: {
+        size: 4,
+        noAlloc: true
+      }
+    });
+    const model = this._getModel(gl);
+    this._setupUniformBuffer(model);
+    this.setState({
+      model
+    });
+  }
+  _getModel(gl) {
+    return new _core2.Model(gl, {
+      ...this.getShaders(),
+      id: this.props.id,
+      geometry: new _core2.CubeGeometry(),
+      isInstanced: true
+    });
+  }
+  draw({
+    uniforms
+  }) {
+    const {
+      cellSize,
+      offset,
+      extruded,
+      elevationScale,
+      coverage,
+      gridSize,
+      gridOrigin,
+      gridOffset,
+      elevationRange,
+      colorMaxMinBuffer,
+      elevationMaxMinBuffer
+    } = this.props;
+    const gridOriginLow = [(0, _core.fp64LowPart)(gridOrigin[0]), (0, _core.fp64LowPart)(gridOrigin[1])];
+    const gridOffsetLow = [(0, _core.fp64LowPart)(gridOffset[0]), (0, _core.fp64LowPart)(gridOffset[1])];
+    const domainUniforms = this.getDomainUniforms();
+    const colorRange = (0, _colorUtils.colorRangeToFlatArray)(this.props.colorRange);
+    this.bindUniformBuffers(colorMaxMinBuffer, elevationMaxMinBuffer);
+    this.state.model.setUniforms(uniforms).setUniforms(domainUniforms).setUniforms({
+      cellSize,
+      offset,
+      extruded,
+      elevationScale,
+      coverage,
+      gridSize,
+      gridOrigin,
+      gridOriginLow,
+      gridOffset,
+      gridOffsetLow,
+      colorRange,
+      elevationRange
+    }).draw();
+    this.unbindUniformBuffers(colorMaxMinBuffer, elevationMaxMinBuffer);
+  }
+  bindUniformBuffers(colorMaxMinBuffer, elevationMaxMinBuffer) {
+    colorMaxMinBuffer.bind({
+      target: 35345,
+      index: COLOR_DATA_UBO_INDEX
+    });
+    elevationMaxMinBuffer.bind({
+      target: 35345,
+      index: ELEVATION_DATA_UBO_INDEX
+    });
+  }
+  unbindUniformBuffers(colorMaxMinBuffer, elevationMaxMinBuffer) {
+    colorMaxMinBuffer.unbind({
+      target: 35345,
+      index: COLOR_DATA_UBO_INDEX
+    });
+    elevationMaxMinBuffer.unbind({
+      target: 35345,
+      index: ELEVATION_DATA_UBO_INDEX
+    });
+  }
+  getDomainUniforms() {
+    const {
+      colorDomain,
+      elevationDomain
+    } = this.props;
+    const domainUniforms = {};
+    if (colorDomain !== null) {
+      domainUniforms.colorDomainValid = true;
+      domainUniforms.colorDomain = colorDomain;
+    } else {
+      domainUniforms.colorDomainValid = false;
+    }
+    if (elevationDomain !== null) {
+      domainUniforms.elevationDomainValid = true;
+      domainUniforms.elevationDomain = elevationDomain;
+    } else {
+      domainUniforms.elevationDomainValid = false;
+    }
+    return domainUniforms;
+  }
+  _setupUniformBuffer(model) {
+    const gl = this.context.gl;
+    const programHandle = model.program.handle;
+    const colorIndex = gl.getUniformBlockIndex(programHandle, 'ColorData');
+    const elevationIndex = gl.getUniformBlockIndex(programHandle, 'ElevationData');
+    gl.uniformBlockBinding(programHandle, colorIndex, COLOR_DATA_UBO_INDEX);
+    gl.uniformBlockBinding(programHandle, elevationIndex, ELEVATION_DATA_UBO_INDEX);
+  }
+}
+exports.default = GPUGridCellLayer;
+(0, _defineProperty2.default)(GPUGridCellLayer, "layerName", 'GPUGridCellLayer');
+(0, _defineProperty2.default)(GPUGridCellLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@luma.gl/shadertools":"node_modules/@luma.gl/shadertools/dist/esm/index.js","../utils/color-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js","./gpu-grid-cell-layer-vertex.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-cell-layer-vertex.glsl.js","./gpu-grid-cell-layer-fragment.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-cell-layer-fragment.glsl.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-layer.js":[function(require,module,exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@luma.gl/core");
+var _core2 = require("@deck.gl/core");
+var _gpuGridAggregator = _interopRequireDefault(require("../utils/gpu-grid-aggregation/gpu-grid-aggregator"));
+var _aggregationOperationUtils = require("../utils/aggregation-operation-utils");
+var _colorUtils = require("../utils/color-utils");
+var _gpuGridCellLayer = _interopRequireDefault(require("./gpu-grid-cell-layer"));
+var _gridAggregator = require("./../cpu-grid-layer/grid-aggregator");
+var _gridAggregationLayer = _interopRequireDefault(require("../grid-aggregation-layer"));
+var _gridAggregationUtils = require("../utils/grid-aggregation-utils");
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const defaultProps = {
+  colorDomain: null,
+  colorRange: _colorUtils.defaultColorRange,
+  getColorWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  colorAggregation: 'SUM',
+  elevationDomain: null,
+  elevationRange: [0, 1000],
+  getElevationWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  elevationAggregation: 'SUM',
+  elevationScale: {
+    type: 'number',
+    min: 0,
+    value: 1
+  },
+  cellSize: {
+    type: 'number',
+    min: 1,
+    max: 1000,
+    value: 1000
+  },
+  coverage: {
+    type: 'number',
+    min: 0,
+    max: 1,
+    value: 1
+  },
+  getPosition: {
+    type: 'accessor',
+    value: x => x.position
+  },
+  extruded: false,
+  material: true
+};
+const DIMENSIONS = {
+  data: {
+    props: ['cellSize', 'colorAggregation', 'elevationAggregation']
+  }
+};
+const POSITION_ATTRIBUTE_NAME = 'positions';
+class GPUGridLayer extends _gridAggregationLayer.default {
+  initializeState({
+    gl
+  }) {
+    const isSupported = _gpuGridAggregator.default.isSupported(gl);
+    if (!isSupported) {
+      _core2.log.error('GPUGridLayer is not supported on this browser, use GridLayer instead')();
+    }
+    super.initializeAggregationLayer({
+      dimensions: DIMENSIONS
+    });
+    this.setState({
+      gpuAggregation: true,
+      projectPoints: false,
+      isSupported,
+      weights: {
+        color: {
+          needMin: true,
+          needMax: true,
+          combineMaxMin: true,
+          maxMinBuffer: new _core.Buffer(gl, {
+            byteLength: 4 * 4,
+            accessor: {
+              size: 4,
+              type: 5126,
+              divisor: 1
+            }
+          })
+        },
+        elevation: {
+          needMin: true,
+          needMax: true,
+          combineMaxMin: true,
+          maxMinBuffer: new _core.Buffer(gl, {
+            byteLength: 4 * 4,
+            accessor: {
+              size: 4,
+              type: 5126,
+              divisor: 1
+            }
+          })
+        }
+      },
+      positionAttributeName: 'positions'
+    });
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      [POSITION_ATTRIBUTE_NAME]: {
+        size: 3,
+        accessor: 'getPosition',
+        type: 5130,
+        fp64: this.use64bitPositions()
+      },
+      color: {
+        size: 3,
+        accessor: 'getColorWeight'
+      },
+      elevation: {
+        size: 3,
+        accessor: 'getElevationWeight'
+      }
+    });
+  }
+  updateState(opts) {
+    if (this.state.isSupported === false) {
+      return;
+    }
+    super.updateState(opts);
+    const {
+      aggregationDirty
+    } = this.state;
+    if (aggregationDirty) {
+      this.setState({
+        gridHash: null
+      });
+    }
+  }
+  getHashKeyForIndex(index) {
+    const {
+      numRow,
+      numCol,
+      boundingBox,
+      gridOffset
+    } = this.state;
+    const gridSize = [numCol, numRow];
+    const gridOrigin = [boundingBox.xMin, boundingBox.yMin];
+    const cellSize = [gridOffset.xOffset, gridOffset.yOffset];
+    const yIndex = Math.floor(index / gridSize[0]);
+    const xIndex = index - yIndex * gridSize[0];
+    const latIdx = Math.floor((yIndex * cellSize[1] + gridOrigin[1] + 90 + cellSize[1] / 2) / cellSize[1]);
+    const lonIdx = Math.floor((xIndex * cellSize[0] + gridOrigin[0] + 180 + cellSize[0] / 2) / cellSize[0]);
+    return "".concat(latIdx, "-").concat(lonIdx);
+  }
+  getPositionForIndex(index) {
+    const {
+      numRow,
+      numCol,
+      boundingBox,
+      gridOffset
+    } = this.state;
+    const gridSize = [numCol, numRow];
+    const gridOrigin = [boundingBox.xMin, boundingBox.yMin];
+    const cellSize = [gridOffset.xOffset, gridOffset.yOffset];
+    const yIndex = Math.floor(index / gridSize[0]);
+    const xIndex = index - yIndex * gridSize[0];
+    const yPos = yIndex * cellSize[1] + gridOrigin[1];
+    const xPos = xIndex * cellSize[0] + gridOrigin[0];
+    return [xPos, yPos];
+  }
+  getPickingInfo({
+    info,
+    mode
+  }) {
+    const {
+      index
+    } = info;
+    let object = null;
+    if (index >= 0) {
+      const {
+        gpuGridAggregator
+      } = this.state;
+      const position = this.getPositionForIndex(index);
+      const colorInfo = _gpuGridAggregator.default.getAggregationData({
+        pixelIndex: index,
+        ...gpuGridAggregator.getData('color')
+      });
+      const elevationInfo = _gpuGridAggregator.default.getAggregationData({
+        pixelIndex: index,
+        ...gpuGridAggregator.getData('elevation')
+      });
+      object = {
+        colorValue: colorInfo.cellWeight,
+        elevationValue: elevationInfo.cellWeight,
+        count: colorInfo.cellCount || elevationInfo.cellCount,
+        position,
+        totalCount: colorInfo.totalCount || elevationInfo.totalCount
+      };
+      if (mode !== 'hover') {
+        const {
+          props
+        } = this;
+        let {
+          gridHash
+        } = this.state;
+        if (!gridHash) {
+          const {
+            gridOffset,
+            translation,
+            boundingBox
+          } = this.state;
+          const {
+            viewport
+          } = this.context;
+          const attributes = this.getAttributes();
+          const cpuAggregation = (0, _gridAggregator.pointToDensityGridDataCPU)(props, {
+            gridOffset,
+            attributes,
+            viewport,
+            translation,
+            boundingBox
+          });
+          gridHash = cpuAggregation.gridHash;
+          this.setState({
+            gridHash
+          });
+        }
+        const key = this.getHashKeyForIndex(index);
+        const cpuAggregationData = gridHash[key];
+        Object.assign(object, cpuAggregationData);
+      }
+    }
+    info.picked = Boolean(object);
+    info.object = object;
+    return info;
+  }
+  renderLayers() {
+    if (!this.state.isSupported) {
+      return null;
+    }
+    const {
+      elevationScale,
+      extruded,
+      cellSize: cellSizeMeters,
+      coverage,
+      material,
+      elevationRange,
+      colorDomain,
+      elevationDomain
+    } = this.props;
+    const {
+      weights,
+      numRow,
+      numCol,
+      gridOrigin,
+      gridOffset
+    } = this.state;
+    const {
+      color,
+      elevation
+    } = weights;
+    const colorRange = (0, _colorUtils.colorRangeToFlatArray)(this.props.colorRange);
+    const SubLayerClass = this.getSubLayerClass('gpu-grid-cell', _gpuGridCellLayer.default);
+    return new SubLayerClass({
+      gridSize: [numCol, numRow],
+      gridOrigin,
+      gridOffset: [gridOffset.xOffset, gridOffset.yOffset],
+      colorRange,
+      elevationRange,
+      colorDomain,
+      elevationDomain,
+      cellSize: cellSizeMeters,
+      coverage,
+      material,
+      elevationScale,
+      extruded
+    }, this.getSubLayerProps({
+      id: 'gpu-grid-cell'
+    }), {
+      data: {
+        attributes: {
+          colors: color.aggregationBuffer,
+          elevations: elevation.aggregationBuffer
+        }
+      },
+      colorMaxMinBuffer: color.maxMinBuffer,
+      elevationMaxMinBuffer: elevation.maxMinBuffer,
+      numInstances: numCol * numRow
+    });
+  }
+  finalizeState(context) {
+    const {
+      color,
+      elevation
+    } = this.state.weights;
+    [color, elevation].forEach(weight => {
+      const {
+        aggregationBuffer,
+        maxMinBuffer
+      } = weight;
+      maxMinBuffer.delete();
+      aggregationBuffer === null || aggregationBuffer === void 0 ? void 0 : aggregationBuffer.delete();
+    });
+    super.finalizeState(context);
+  }
+  updateAggregationState(opts) {
+    const {
+      props,
+      oldProps
+    } = opts;
+    const {
+      cellSize,
+      coordinateSystem
+    } = props;
+    const {
+      viewport
+    } = this.context;
+    const cellSizeChanged = oldProps.cellSize !== cellSize;
+    const {
+      dimensions
+    } = this.state;
+    const positionsChanged = this.isAttributeChanged(POSITION_ATTRIBUTE_NAME);
+    const attributesChanged = positionsChanged || this.isAttributeChanged();
+    let {
+      boundingBox
+    } = this.state;
+    if (positionsChanged) {
+      boundingBox = (0, _gridAggregationUtils.getBoundingBox)(this.getAttributes(), this.getNumInstances());
+      this.setState({
+        boundingBox
+      });
+    }
+    if (positionsChanged || cellSizeChanged) {
+      const {
+        gridOffset,
+        translation,
+        width,
+        height,
+        numCol,
+        numRow
+      } = (0, _gridAggregationUtils.getGridParams)(boundingBox, cellSize, viewport, coordinateSystem);
+      this.allocateResources(numRow, numCol);
+      this.setState({
+        gridOffset,
+        translation,
+        gridOrigin: [-1 * translation[0], -1 * translation[1]],
+        width,
+        height,
+        numCol,
+        numRow
+      });
+    }
+    const aggregationDataDirty = attributesChanged || this.isAggregationDirty(opts, {
+      dimension: dimensions.data,
+      compareAll: true
+    });
+    if (aggregationDataDirty) {
+      this._updateAccessors(opts);
+    }
+    this.setState({
+      aggregationDataDirty
+    });
+  }
+  _updateAccessors(opts) {
+    const {
+      colorAggregation,
+      elevationAggregation
+    } = opts.props;
+    const {
+      color,
+      elevation
+    } = this.state.weights;
+    color.operation = _aggregationOperationUtils.AGGREGATION_OPERATION[colorAggregation];
+    elevation.operation = _aggregationOperationUtils.AGGREGATION_OPERATION[elevationAggregation];
+  }
+}
+exports.default = GPUGridLayer;
+(0, _defineProperty2.default)(GPUGridLayer, "layerName", 'GPUGridLayer');
+(0, _defineProperty2.default)(GPUGridLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","../utils/gpu-grid-aggregation/gpu-grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js","../utils/aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js","../utils/color-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js","./gpu-grid-cell-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-cell-layer.js","./../cpu-grid-layer/grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/grid-aggregator.js","../grid-aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/grid-aggregation-layer.js","../utils/grid-aggregation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/grid-aggregation-utils.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/grid-layer/grid-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@deck.gl/core");
+var _gpuGridAggregator = _interopRequireDefault(require("../utils/gpu-grid-aggregation/gpu-grid-aggregator"));
+var _gpuGridLayer = _interopRequireDefault(require("../gpu-grid-layer/gpu-grid-layer"));
+var _cpuGridLayer = _interopRequireDefault(require("../cpu-grid-layer/cpu-grid-layer"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const defaultProps = {
+  ..._gpuGridLayer.default.defaultProps,
+  ..._cpuGridLayer.default.defaultProps,
+  gpuAggregation: false
+};
+class GridLayer extends _core.CompositeLayer {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  initializeState() {
+    this.state = {
+      useGPUAggregation: true
+    };
+  }
+  updateState({
+    props
+  }) {
+    this.setState({
+      useGPUAggregation: this.canUseGPUAggregation(props)
+    });
+  }
+  renderLayers() {
+    const {
+      data,
+      updateTriggers
+    } = this.props;
+    const id = this.state.useGPUAggregation ? 'GPU' : 'CPU';
+    const LayerType = this.state.useGPUAggregation ? this.getSubLayerClass('GPU', _gpuGridLayer.default) : this.getSubLayerClass('CPU', _cpuGridLayer.default);
+    return new LayerType(this.props, this.getSubLayerProps({
+      id,
+      updateTriggers
+    }), {
+      data
+    });
+  }
+  canUseGPUAggregation(props) {
+    const {
+      gpuAggregation,
+      lowerPercentile,
+      upperPercentile,
+      getColorValue,
+      getElevationValue,
+      colorScaleType
+    } = props;
+    if (!gpuAggregation) {
+      return false;
+    }
+    if (!_gpuGridAggregator.default.isSupported(this.context.gl)) {
+      return false;
+    }
+    if (lowerPercentile !== 0 || upperPercentile !== 100) {
+      return false;
+    }
+    if (getColorValue !== null || getElevationValue !== null) {
+      return false;
+    }
+    if (colorScaleType === 'quantile' || colorScaleType === 'ordinal') {
+      return false;
+    }
+    return true;
+  }
+}
+exports.default = GridLayer;
+(0, _defineProperty2.default)(GridLayer, "layerName", 'GridLayer');
+(0, _defineProperty2.default)(GridLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","../utils/gpu-grid-aggregation/gpu-grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js","../gpu-grid-layer/gpu-grid-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-layer.js","../cpu-grid-layer/cpu-grid-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/cpu-grid-layer.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/heatmap-layer-utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.boundsContain = boundsContain;
+exports.getBounds = getBounds;
+exports.getTextureCoordinates = getTextureCoordinates;
+exports.getTextureParams = getTextureParams;
+exports.packVertices = packVertices;
+exports.scaleToAspectRatio = scaleToAspectRatio;
+var _core = require("@luma.gl/core");
+function getBounds(points) {
+  const x = points.map(p => p[0]);
+  const y = points.map(p => p[1]);
+  const xMin = Math.min.apply(null, x);
+  const xMax = Math.max.apply(null, x);
+  const yMin = Math.min.apply(null, y);
+  const yMax = Math.max.apply(null, y);
+  return [xMin, yMin, xMax, yMax];
+}
+function boundsContain(currentBounds, targetBounds) {
+  if (targetBounds[0] >= currentBounds[0] && targetBounds[2] <= currentBounds[2] && targetBounds[1] >= currentBounds[1] && targetBounds[3] <= currentBounds[3]) {
+    return true;
+  }
+  return false;
+}
+const scratchArray = new Float32Array(12);
+function packVertices(points, dimensions = 2) {
+  let index = 0;
+  for (const point of points) {
+    for (let i = 0; i < dimensions; i++) {
+      scratchArray[index++] = point[i] || 0;
+    }
+  }
+  return scratchArray;
+}
+function scaleToAspectRatio(boundingBox, width, height) {
+  const [xMin, yMin, xMax, yMax] = boundingBox;
+  const currentWidth = xMax - xMin;
+  const currentHeight = yMax - yMin;
+  let newWidth = currentWidth;
+  let newHeight = currentHeight;
+  if (currentWidth / currentHeight < width / height) {
+    newWidth = width / height * currentHeight;
+  } else {
+    newHeight = height / width * currentWidth;
+  }
+  if (newWidth < width) {
+    newWidth = width;
+    newHeight = height;
+  }
+  const xCenter = (xMax + xMin) / 2;
+  const yCenter = (yMax + yMin) / 2;
+  return [xCenter - newWidth / 2, yCenter - newHeight / 2, xCenter + newWidth / 2, yCenter + newHeight / 2];
+}
+function getTextureCoordinates(point, bounds) {
+  const [xMin, yMin, xMax, yMax] = bounds;
+  return [(point[0] - xMin) / (xMax - xMin), (point[1] - yMin) / (yMax - yMin)];
+}
+function getTextureParams({
+  gl,
+  floatTargetSupport
+}) {
+  return floatTargetSupport ? {
+    format: (0, _core.isWebGL2)(gl) ? 34836 : 6408,
+    type: 5126
+  } : {
+    format: 6408,
+    type: 5121
+  };
+}
+},{"@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/triangle-layer-vertex.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME heatp-map-layer-vertex-shader\n\nuniform sampler2D maxTexture;\nuniform float intensity;\nuniform vec2 colorDomain;\nuniform float threshold;\nuniform float aggregationMode;\n\nattribute vec3 positions;\nattribute vec2 texCoords;\n\nvarying vec2 vTexCoords;\nvarying float vIntensityMin;\nvarying float vIntensityMax;\n\nvoid main(void) {\n  gl_Position = project_position_to_clipspace(positions, vec3(0.0), vec3(0.0));\n  vTexCoords = texCoords;\n  vec4 maxTexture = texture2D(maxTexture, vec2(0.5));\n  float maxValue = aggregationMode < 0.5 ? maxTexture.r : maxTexture.g;\n  float minValue = maxValue * threshold;\n  if (colorDomain[1] > 0.) {\n    maxValue = colorDomain[1];\n    minValue = colorDomain[0];\n  }\n  vIntensityMax = intensity / maxValue;\n  vIntensityMin = intensity / minValue;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/triangle-layer-fragment.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "#define SHADER_NAME triangle-layer-fragment-shader\n\nprecision highp float;\n\nuniform float opacity;\nuniform sampler2D texture;\nuniform sampler2D colorTexture;\nuniform float aggregationMode;\n\nvarying vec2 vTexCoords;\nvarying float vIntensityMin;\nvarying float vIntensityMax;\n\nvec4 getLinearColor(float value) {\n  float factor = clamp(value * vIntensityMax, 0., 1.);\n  vec4 color = texture2D(colorTexture, vec2(factor, 0.5));\n  color.a *= min(value * vIntensityMin, 1.0);\n  return color;\n}\n\nvoid main(void) {\n  vec4 weights = texture2D(texture, vTexCoords);\n  float weight = weights.r;\n\n  if (aggregationMode > 0.5) {\n    weight /= max(1.0, weights.a);\n  }\n  if (weight <= 0.) {\n     discard;\n  }\n\n  vec4 linearColor = getLinearColor(weight);\n  linearColor.a *= opacity;\n  gl_FragColor =linearColor;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/triangle-layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _core = require("@luma.gl/core");
+var _core2 = require("@deck.gl/core");
+var _triangleLayerVertex = _interopRequireDefault(require("./triangle-layer-vertex.glsl"));
+var _triangleLayerFragment = _interopRequireDefault(require("./triangle-layer-fragment.glsl"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+class TriangleLayer extends _core2.Layer {
+  getShaders() {
+    return {
+      vs: _triangleLayerVertex.default,
+      fs: _triangleLayerFragment.default,
+      modules: [_core2.project32]
+    };
+  }
+  initializeState({
+    gl
+  }) {
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      positions: {
+        size: 3,
+        noAlloc: true
+      },
+      texCoords: {
+        size: 2,
+        noAlloc: true
+      }
+    });
+    this.setState({
+      model: this._getModel(gl)
+    });
+  }
+  _getModel(gl) {
+    const {
+      vertexCount
+    } = this.props;
+    return new _core.Model(gl, {
+      ...this.getShaders(),
+      id: this.props.id,
+      geometry: new _core.Geometry({
+        drawMode: 6,
+        vertexCount
+      })
+    });
+  }
+  draw({
+    uniforms
+  }) {
+    const {
+      model
+    } = this.state;
+    const {
+      texture,
+      maxTexture,
+      colorTexture,
+      intensity,
+      threshold,
+      aggregationMode,
+      colorDomain
+    } = this.props;
+    model.setUniforms({
+      ...uniforms,
+      texture,
+      maxTexture,
+      colorTexture,
+      intensity,
+      threshold,
+      aggregationMode,
+      colorDomain
+    }).draw();
+  }
+}
+exports.default = TriangleLayer;
+(0, _defineProperty2.default)(TriangleLayer, "layerName", 'TriangleLayer');
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","./triangle-layer-vertex.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/triangle-layer-vertex.glsl.js","./triangle-layer-fragment.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/triangle-layer-fragment.glsl.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/weights-vs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "attribute vec3 positions;\nattribute vec3 positions64Low;\nattribute float weights;\nvarying vec4 weightsTexture;\nuniform float radiusPixels;\nuniform float textureWidth;\nuniform vec4 commonBounds;\nuniform float weightsScale;\nvoid main()\n{\n  weightsTexture = vec4(weights * weightsScale, 0., 0., 1.);\n\n  float radiusTexels  = project_pixel_size(radiusPixels) * textureWidth / (commonBounds.z - commonBounds.x);\n  gl_PointSize = radiusTexels * 2.;\n\n  vec3 commonPosition = project_position(positions, positions64Low);\n  gl_Position.xy = (commonPosition.xy - commonBounds.xy) / (commonBounds.zw - commonBounds.xy) ;\n  gl_Position.xy = (gl_Position.xy * 2.) - (1.);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/weights-fs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "varying vec4 weightsTexture;\nfloat gaussianKDE(float u){\n  return pow(2.71828, -u*u/0.05555)/(1.77245385*0.166666);\n}\nvoid main()\n{\n  float dist = length(gl_PointCoord - vec2(0.5, 0.5));\n  if (dist > 0.5) {\n    discard;\n  }\n  gl_FragColor = weightsTexture * gaussianKDE(2. * dist);\n  DECKGL_FILTER_COLOR(gl_FragColor, geometry);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/max-vs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "attribute vec4 inTexture;\nvarying vec4 outTexture;\n\nvoid main()\n{\noutTexture = inTexture;\ngl_Position = vec4(0, 0, 0, 1.);\ngl_PointSize = 1.0;\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/max-fs.glsl.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _default = "varying vec4 outTexture;\nvoid main() {\n  gl_FragColor = outTexture;\n  gl_FragColor.g = outTexture.r / max(1.0, outTexture.a);\n}\n";
+exports.default = _default;
+},{}],"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/heatmap-layer.js":[function(require,module,exports) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var _defineProperty2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/defineProperty"));
+var _heatmapLayerUtils = require("./heatmap-layer-utils");
+var _core = require("@luma.gl/core");
+var _core2 = require("@deck.gl/core");
+var _triangleLayer = _interopRequireDefault(require("./triangle-layer"));
+var _aggregationLayer = _interopRequireDefault(require("../aggregation-layer"));
+var _colorUtils = require("../utils/color-utils");
+var _weightsVs = _interopRequireDefault(require("./weights-vs.glsl"));
+var _weightsFs = _interopRequireDefault(require("./weights-fs.glsl"));
+var _maxVs = _interopRequireDefault(require("./max-vs.glsl"));
+var _maxFs = _interopRequireDefault(require("./max-fs.glsl"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+const RESOLUTION = 2;
+const TEXTURE_OPTIONS = {
+  mipmaps: false,
+  parameters: {
+    [10240]: 9729,
+    [10241]: 9729,
+    [10242]: 33071,
+    [10243]: 33071
+  },
+  dataFormat: 6408
+};
+const DEFAULT_COLOR_DOMAIN = [0, 0];
+const AGGREGATION_MODE = {
+  SUM: 0,
+  MEAN: 1
+};
+const defaultProps = {
+  getPosition: {
+    type: 'accessor',
+    value: x => x.position
+  },
+  getWeight: {
+    type: 'accessor',
+    value: 1
+  },
+  intensity: {
+    type: 'number',
+    min: 0,
+    value: 1
+  },
+  radiusPixels: {
+    type: 'number',
+    min: 1,
+    max: 100,
+    value: 50
+  },
+  colorRange: _colorUtils.defaultColorRange,
+  threshold: {
+    type: 'number',
+    min: 0,
+    max: 1,
+    value: 0.05
+  },
+  colorDomain: {
+    type: 'array',
+    value: null,
+    optional: true
+  },
+  aggregation: 'SUM',
+  weightsTextureSize: {
+    type: 'number',
+    min: 128,
+    max: 2048,
+    value: 2048
+  },
+  debounceTimeout: {
+    type: 'number',
+    min: 0,
+    max: 1000,
+    value: 500
+  }
+};
+const REQUIRED_FEATURES = [_core.FEATURES.BLEND_EQUATION_MINMAX, _core.FEATURES.TEXTURE_FLOAT];
+const FLOAT_TARGET_FEATURES = [_core.FEATURES.COLOR_ATTACHMENT_RGBA32F, _core.FEATURES.FLOAT_BLEND];
+const DIMENSIONS = {
+  data: {
+    props: ['radiusPixels']
+  }
+};
+class HeatmapLayer extends _aggregationLayer.default {
+  constructor(...args) {
+    super(...args);
+    (0, _defineProperty2.default)(this, "state", void 0);
+  }
+  initializeState() {
+    const {
+      gl
+    } = this.context;
+    if (!(0, _core.hasFeatures)(gl, REQUIRED_FEATURES)) {
+      this.setState({
+        supported: false
+      });
+      _core2.log.error("HeatmapLayer: ".concat(this.id, " is not supported on this browser"))();
+      return;
+    }
+    super.initializeAggregationLayer(DIMENSIONS);
+    this.setState({
+      supported: true,
+      colorDomain: DEFAULT_COLOR_DOMAIN
+    });
+    this._setupTextureParams();
+    this._setupAttributes();
+    this._setupResources();
+  }
+  shouldUpdateState({
+    changeFlags
+  }) {
+    return changeFlags.somethingChanged;
+  }
+  updateState(opts) {
+    if (!this.state.supported) {
+      return;
+    }
+    super.updateState(opts);
+    this._updateHeatmapState(opts);
+  }
+  _updateHeatmapState(opts) {
+    const {
+      props,
+      oldProps
+    } = opts;
+    const changeFlags = this._getChangeFlags(opts);
+    if (changeFlags.dataChanged || changeFlags.viewportChanged) {
+      changeFlags.boundsChanged = this._updateBounds(changeFlags.dataChanged);
+      this._updateTextureRenderingBounds();
+    }
+    if (changeFlags.dataChanged || changeFlags.boundsChanged) {
+      clearTimeout(this.state.updateTimer);
+      this.setState({
+        isWeightMapDirty: true
+      });
+    } else if (changeFlags.viewportZoomChanged) {
+      this._debouncedUpdateWeightmap();
+    }
+    if (props.colorRange !== oldProps.colorRange) {
+      this._updateColorTexture(opts);
+    }
+    if (this.state.isWeightMapDirty) {
+      this._updateWeightmap();
+    }
+    this.setState({
+      zoom: opts.context.viewport.zoom
+    });
+  }
+  renderLayers() {
+    if (!this.state.supported) {
+      return [];
+    }
+    const {
+      weightsTexture,
+      triPositionBuffer,
+      triTexCoordBuffer,
+      maxWeightsTexture,
+      colorTexture,
+      colorDomain
+    } = this.state;
+    const {
+      updateTriggers,
+      intensity,
+      threshold,
+      aggregation
+    } = this.props;
+    const TriangleLayerClass = this.getSubLayerClass('triangle', _triangleLayer.default);
+    return new TriangleLayerClass(this.getSubLayerProps({
+      id: 'triangle-layer',
+      updateTriggers
+    }), {
+      coordinateSystem: _core2.COORDINATE_SYSTEM.DEFAULT,
+      data: {
+        attributes: {
+          positions: triPositionBuffer,
+          texCoords: triTexCoordBuffer
+        }
+      },
+      vertexCount: 4,
+      maxTexture: maxWeightsTexture,
+      colorTexture,
+      aggregationMode: AGGREGATION_MODE[aggregation] || 0,
+      texture: weightsTexture,
+      intensity,
+      threshold,
+      colorDomain
+    });
+  }
+  finalizeState(context) {
+    super.finalizeState(context);
+    const {
+      weightsTransform,
+      weightsTexture,
+      maxWeightTransform,
+      maxWeightsTexture,
+      triPositionBuffer,
+      triTexCoordBuffer,
+      colorTexture,
+      updateTimer
+    } = this.state;
+    weightsTransform === null || weightsTransform === void 0 ? void 0 : weightsTransform.delete();
+    weightsTexture === null || weightsTexture === void 0 ? void 0 : weightsTexture.delete();
+    maxWeightTransform === null || maxWeightTransform === void 0 ? void 0 : maxWeightTransform.delete();
+    maxWeightsTexture === null || maxWeightsTexture === void 0 ? void 0 : maxWeightsTexture.delete();
+    triPositionBuffer === null || triPositionBuffer === void 0 ? void 0 : triPositionBuffer.delete();
+    triTexCoordBuffer === null || triTexCoordBuffer === void 0 ? void 0 : triTexCoordBuffer.delete();
+    colorTexture === null || colorTexture === void 0 ? void 0 : colorTexture.delete();
+    if (updateTimer) {
+      clearTimeout(updateTimer);
+    }
+  }
+  _getAttributeManager() {
+    return new _core2.AttributeManager(this.context.gl, {
+      id: this.props.id,
+      stats: this.context.stats
+    });
+  }
+  _getChangeFlags(opts) {
+    const changeFlags = {};
+    const {
+      dimensions
+    } = this.state;
+    changeFlags.dataChanged = this.isAttributeChanged() || this.isAggregationDirty(opts, {
+      compareAll: true,
+      dimension: dimensions.data
+    });
+    changeFlags.viewportChanged = opts.changeFlags.viewportChanged;
+    const {
+      zoom
+    } = this.state;
+    if (!opts.context.viewport || opts.context.viewport.zoom !== zoom) {
+      changeFlags.viewportZoomChanged = true;
+    }
+    return changeFlags;
+  }
+  _createTextures() {
+    const {
+      gl
+    } = this.context;
+    const {
+      textureSize,
+      format,
+      type
+    } = this.state;
+    this.setState({
+      weightsTexture: new _core.Texture2D(gl, {
+        width: textureSize,
+        height: textureSize,
+        format,
+        type,
+        ...TEXTURE_OPTIONS
+      }),
+      maxWeightsTexture: new _core.Texture2D(gl, {
+        format,
+        type,
+        ...TEXTURE_OPTIONS
+      })
+    });
+  }
+  _setupAttributes() {
+    const attributeManager = this.getAttributeManager();
+    attributeManager.add({
+      positions: {
+        size: 3,
+        type: 5130,
+        accessor: 'getPosition'
+      },
+      weights: {
+        size: 1,
+        accessor: 'getWeight'
+      }
+    });
+    this.setState({
+      positionAttributeName: 'positions'
+    });
+  }
+  _setupTextureParams() {
+    const {
+      gl
+    } = this.context;
+    const {
+      weightsTextureSize
+    } = this.props;
+    const textureSize = Math.min(weightsTextureSize, (0, _core.getParameters)(gl, 3379));
+    const floatTargetSupport = (0, _core.hasFeatures)(gl, FLOAT_TARGET_FEATURES);
+    const {
+      format,
+      type
+    } = (0, _heatmapLayerUtils.getTextureParams)({
+      gl,
+      floatTargetSupport
+    });
+    const weightsScale = floatTargetSupport ? 1 : 1 / 255;
+    this.setState({
+      textureSize,
+      format,
+      type,
+      weightsScale
+    });
+    if (!floatTargetSupport) {
+      _core2.log.warn("HeatmapLayer: ".concat(this.id, " rendering to float texture not supported, fallingback to low precession format"))();
+    }
+  }
+  getShaders(type) {
+    return super.getShaders(type === 'max-weights-transform' ? {
+      vs: _maxVs.default,
+      _fs: _maxFs.default
+    } : {
+      vs: _weightsVs.default,
+      _fs: _weightsFs.default
+    });
+  }
+  _createWeightsTransform(shaders = {}) {
+    var _weightsTransform;
+    const {
+      gl
+    } = this.context;
+    let {
+      weightsTransform
+    } = this.state;
+    const {
+      weightsTexture
+    } = this.state;
+    (_weightsTransform = weightsTransform) === null || _weightsTransform === void 0 ? void 0 : _weightsTransform.delete();
+    weightsTransform = new _core.Transform(gl, {
+      id: "".concat(this.id, "-weights-transform"),
+      elementCount: 1,
+      _targetTexture: weightsTexture,
+      _targetTextureVarying: 'weightsTexture',
+      ...shaders
+    });
+    this.setState({
+      weightsTransform
+    });
+  }
+  _setupResources() {
+    const {
+      gl
+    } = this.context;
+    this._createTextures();
+    const {
+      textureSize,
+      weightsTexture,
+      maxWeightsTexture
+    } = this.state;
+    const weightsTransformShaders = this.getShaders('weights-transform');
+    this._createWeightsTransform(weightsTransformShaders);
+    const maxWeightsTransformShaders = this.getShaders('max-weights-transform');
+    const maxWeightTransform = new _core.Transform(gl, {
+      id: "".concat(this.id, "-max-weights-transform"),
+      _sourceTextures: {
+        inTexture: weightsTexture
+      },
+      _targetTexture: maxWeightsTexture,
+      _targetTextureVarying: 'outTexture',
+      ...maxWeightsTransformShaders,
+      elementCount: textureSize * textureSize
+    });
+    this.setState({
+      weightsTexture,
+      maxWeightsTexture,
+      maxWeightTransform,
+      zoom: null,
+      triPositionBuffer: new _core.Buffer(gl, {
+        byteLength: 48,
+        accessor: {
+          size: 3
+        }
+      }),
+      triTexCoordBuffer: new _core.Buffer(gl, {
+        byteLength: 48,
+        accessor: {
+          size: 2
+        }
+      })
+    });
+  }
+  updateShaders(shaderOptions) {
+    this._createWeightsTransform(shaderOptions);
+  }
+  _updateMaxWeightValue() {
+    const {
+      maxWeightTransform
+    } = this.state;
+    maxWeightTransform.run({
+      parameters: {
+        blend: true,
+        depthTest: false,
+        blendFunc: [1, 1],
+        blendEquation: 32776
+      }
+    });
+  }
+  _updateBounds(forceUpdate = false) {
+    const {
+      viewport
+    } = this.context;
+    const viewportCorners = [viewport.unproject([0, 0]), viewport.unproject([viewport.width, 0]), viewport.unproject([viewport.width, viewport.height]), viewport.unproject([0, viewport.height])].map(p => p.map(Math.fround));
+    const visibleWorldBounds = (0, _heatmapLayerUtils.getBounds)(viewportCorners);
+    const newState = {
+      visibleWorldBounds,
+      viewportCorners
+    };
+    let boundsChanged = false;
+    if (forceUpdate || !this.state.worldBounds || !(0, _heatmapLayerUtils.boundsContain)(this.state.worldBounds, visibleWorldBounds)) {
+      const scaledCommonBounds = this._worldToCommonBounds(visibleWorldBounds);
+      const worldBounds = this._commonToWorldBounds(scaledCommonBounds);
+      if (this.props.coordinateSystem === _core2.COORDINATE_SYSTEM.LNGLAT) {
+        worldBounds[1] = Math.max(worldBounds[1], -85.051129);
+        worldBounds[3] = Math.min(worldBounds[3], 85.051129);
+        worldBounds[0] = Math.max(worldBounds[0], -360);
+        worldBounds[2] = Math.min(worldBounds[2], 360);
+      }
+      const normalizedCommonBounds = this._worldToCommonBounds(worldBounds);
+      newState.worldBounds = worldBounds;
+      newState.normalizedCommonBounds = normalizedCommonBounds;
+      boundsChanged = true;
+    }
+    this.setState(newState);
+    return boundsChanged;
+  }
+  _updateTextureRenderingBounds() {
+    const {
+      triPositionBuffer,
+      triTexCoordBuffer,
+      normalizedCommonBounds,
+      viewportCorners
+    } = this.state;
+    const {
+      viewport
+    } = this.context;
+    triPositionBuffer.subData((0, _heatmapLayerUtils.packVertices)(viewportCorners, 3));
+    const textureBounds = viewportCorners.map(p => (0, _heatmapLayerUtils.getTextureCoordinates)(viewport.projectPosition(p), normalizedCommonBounds));
+    triTexCoordBuffer.subData((0, _heatmapLayerUtils.packVertices)(textureBounds, 2));
+  }
+  _updateColorTexture(opts) {
+    const {
+      colorRange
+    } = opts.props;
+    let {
+      colorTexture
+    } = this.state;
+    const colors = (0, _colorUtils.colorRangeToFlatArray)(colorRange, false, Uint8Array);
+    if (colorTexture) {
+      colorTexture.setImageData({
+        data: colors,
+        width: colorRange.length
+      });
+    } else {
+      colorTexture = new _core.Texture2D(this.context.gl, {
+        data: colors,
+        width: colorRange.length,
+        height: 1,
+        ...TEXTURE_OPTIONS
+      });
+    }
+    this.setState({
+      colorTexture
+    });
+  }
+  _updateWeightmap() {
+    const {
+      radiusPixels,
+      colorDomain,
+      aggregation
+    } = this.props;
+    const {
+      weightsTransform,
+      worldBounds,
+      textureSize,
+      weightsTexture,
+      weightsScale
+    } = this.state;
+    this.state.isWeightMapDirty = false;
+    const commonBounds = this._worldToCommonBounds(worldBounds, {
+      useLayerCoordinateSystem: true
+    });
+    if (colorDomain && aggregation === 'SUM') {
+      const {
+        viewport
+      } = this.context;
+      const metersPerPixel = viewport.distanceScales.metersPerUnit[2] * (commonBounds[2] - commonBounds[0]) / textureSize;
+      this.state.colorDomain = colorDomain.map(x => x * metersPerPixel * weightsScale);
+    } else {
+      this.state.colorDomain = colorDomain || DEFAULT_COLOR_DOMAIN;
+    }
+    const uniforms = {
+      radiusPixels,
+      commonBounds,
+      textureWidth: textureSize,
+      weightsScale
+    };
+    weightsTransform.update({
+      elementCount: this.getNumInstances()
+    });
+    (0, _core.withParameters)(this.context.gl, {
+      clearColor: [0, 0, 0, 0]
+    }, () => {
+      weightsTransform.run({
+        uniforms,
+        parameters: {
+          blend: true,
+          depthTest: false,
+          blendFunc: [1, 1],
+          blendEquation: 32774
+        },
+        clearRenderTarget: true,
+        attributes: this.getAttributes(),
+        moduleSettings: this.getModuleSettings()
+      });
+    });
+    this._updateMaxWeightValue();
+    weightsTexture.setParameters({
+      [10240]: 9729,
+      [10241]: 9729
+    });
+  }
+  _debouncedUpdateWeightmap(fromTimer = false) {
+    let {
+      updateTimer
+    } = this.state;
+    const {
+      debounceTimeout
+    } = this.props;
+    if (fromTimer) {
+      updateTimer = null;
+      this._updateBounds(true);
+      this._updateTextureRenderingBounds();
+      this.setState({
+        isWeightMapDirty: true
+      });
+    } else {
+      this.setState({
+        isWeightMapDirty: false
+      });
+      clearTimeout(updateTimer);
+      updateTimer = setTimeout(this._debouncedUpdateWeightmap.bind(this, true), debounceTimeout);
+    }
+    this.setState({
+      updateTimer
+    });
+  }
+  _worldToCommonBounds(worldBounds, opts = {}) {
+    const {
+      useLayerCoordinateSystem = false
+    } = opts;
+    const [minLong, minLat, maxLong, maxLat] = worldBounds;
+    const {
+      viewport
+    } = this.context;
+    const {
+      textureSize
+    } = this.state;
+    const {
+      coordinateSystem
+    } = this.props;
+    const offsetMode = useLayerCoordinateSystem && (coordinateSystem === _core2.COORDINATE_SYSTEM.LNGLAT_OFFSETS || coordinateSystem === _core2.COORDINATE_SYSTEM.METER_OFFSETS);
+    const offsetOriginCommon = offsetMode ? viewport.projectPosition(this.props.coordinateOrigin) : [0, 0];
+    const size = textureSize * RESOLUTION / viewport.scale;
+    let bottomLeftCommon;
+    let topRightCommon;
+    if (useLayerCoordinateSystem && !offsetMode) {
+      bottomLeftCommon = this.projectPosition([minLong, minLat, 0]);
+      topRightCommon = this.projectPosition([maxLong, maxLat, 0]);
+    } else {
+      bottomLeftCommon = viewport.projectPosition([minLong, minLat, 0]);
+      topRightCommon = viewport.projectPosition([maxLong, maxLat, 0]);
+    }
+    return (0, _heatmapLayerUtils.scaleToAspectRatio)([bottomLeftCommon[0] - offsetOriginCommon[0], bottomLeftCommon[1] - offsetOriginCommon[1], topRightCommon[0] - offsetOriginCommon[0], topRightCommon[1] - offsetOriginCommon[1]], size, size);
+  }
+  _commonToWorldBounds(commonBounds) {
+    const [xMin, yMin, xMax, yMax] = commonBounds;
+    const {
+      viewport
+    } = this.context;
+    const bottomLeftWorld = viewport.unprojectPosition([xMin, yMin]);
+    const topRightWorld = viewport.unprojectPosition([xMax, yMax]);
+    return bottomLeftWorld.slice(0, 2).concat(topRightWorld.slice(0, 2));
+  }
+}
+exports.default = HeatmapLayer;
+(0, _defineProperty2.default)(HeatmapLayer, "layerName", 'HeatmapLayer');
+(0, _defineProperty2.default)(HeatmapLayer, "defaultProps", defaultProps);
+},{"@babel/runtime/helpers/esm/defineProperty":"node_modules/@babel/runtime/helpers/esm/defineProperty.js","./heatmap-layer-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/heatmap-layer-utils.js","@luma.gl/core":"node_modules/@luma.gl/core/dist/esm/index.js","@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","./triangle-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/triangle-layer.js","../aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/aggregation-layer.js","../utils/color-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/color-utils.js","./weights-vs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/weights-vs.glsl.js","./weights-fs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/weights-fs.glsl.js","./max-vs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/max-vs.glsl.js","./max-fs.glsl":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/max-fs.glsl.js"}],"node_modules/@deck.gl/aggregation-layers/dist/esm/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "AGGREGATION_OPERATION", {
+  enumerable: true,
+  get: function () {
+    return _aggregationOperationUtils.AGGREGATION_OPERATION;
+  }
+});
+Object.defineProperty(exports, "CPUGridLayer", {
+  enumerable: true,
+  get: function () {
+    return _cpuGridLayer.default;
+  }
+});
+Object.defineProperty(exports, "ContourLayer", {
+  enumerable: true,
+  get: function () {
+    return _contourLayer.default;
+  }
+});
+Object.defineProperty(exports, "GPUGridLayer", {
+  enumerable: true,
+  get: function () {
+    return _gpuGridLayer.default;
+  }
+});
+Object.defineProperty(exports, "GridLayer", {
+  enumerable: true,
+  get: function () {
+    return _gridLayer.default;
+  }
+});
+Object.defineProperty(exports, "HeatmapLayer", {
+  enumerable: true,
+  get: function () {
+    return _heatmapLayer.default;
+  }
+});
+Object.defineProperty(exports, "HexagonLayer", {
+  enumerable: true,
+  get: function () {
+    return _hexagonLayer.default;
+  }
+});
+Object.defineProperty(exports, "ScreenGridLayer", {
+  enumerable: true,
+  get: function () {
+    return _screenGridLayer.default;
+  }
+});
+Object.defineProperty(exports, "_AggregationLayer", {
+  enumerable: true,
+  get: function () {
+    return _aggregationLayer.default;
+  }
+});
+Object.defineProperty(exports, "_BinSorter", {
+  enumerable: true,
+  get: function () {
+    return _binSorter.default;
+  }
+});
+Object.defineProperty(exports, "_CPUAggregator", {
+  enumerable: true,
+  get: function () {
+    return _cpuAggregator.default;
+  }
+});
+Object.defineProperty(exports, "_GPUGridAggregator", {
+  enumerable: true,
+  get: function () {
+    return _gpuGridAggregator.default;
+  }
+});
+var _screenGridLayer = _interopRequireDefault(require("./screen-grid-layer/screen-grid-layer"));
+var _cpuGridLayer = _interopRequireDefault(require("./cpu-grid-layer/cpu-grid-layer"));
+var _hexagonLayer = _interopRequireDefault(require("./hexagon-layer/hexagon-layer"));
+var _contourLayer = _interopRequireDefault(require("./contour-layer/contour-layer"));
+var _gridLayer = _interopRequireDefault(require("./grid-layer/grid-layer"));
+var _gpuGridLayer = _interopRequireDefault(require("./gpu-grid-layer/gpu-grid-layer"));
+var _aggregationOperationUtils = require("./utils/aggregation-operation-utils");
+var _heatmapLayer = _interopRequireDefault(require("./heatmap-layer/heatmap-layer"));
+var _gpuGridAggregator = _interopRequireDefault(require("./utils/gpu-grid-aggregation/gpu-grid-aggregator"));
+var _cpuAggregator = _interopRequireDefault(require("./utils/cpu-aggregator"));
+var _aggregationLayer = _interopRequireDefault(require("./aggregation-layer"));
+var _binSorter = _interopRequireDefault(require("./utils/bin-sorter"));
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./screen-grid-layer/screen-grid-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/screen-grid-layer/screen-grid-layer.js","./cpu-grid-layer/cpu-grid-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/cpu-grid-layer/cpu-grid-layer.js","./hexagon-layer/hexagon-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/hexagon-layer/hexagon-layer.js","./contour-layer/contour-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/contour-layer/contour-layer.js","./grid-layer/grid-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/grid-layer/grid-layer.js","./gpu-grid-layer/gpu-grid-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/gpu-grid-layer/gpu-grid-layer.js","./utils/aggregation-operation-utils":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/aggregation-operation-utils.js","./heatmap-layer/heatmap-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/heatmap-layer/heatmap-layer.js","./utils/gpu-grid-aggregation/gpu-grid-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/gpu-grid-aggregation/gpu-grid-aggregator.js","./utils/cpu-aggregator":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/cpu-aggregator.js","./aggregation-layer":"node_modules/@deck.gl/aggregation-layers/dist/esm/aggregation-layer.js","./utils/bin-sorter":"node_modules/@deck.gl/aggregation-layers/dist/esm/utils/bin-sorter.js"}],"src/deckLayers.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.layers1 = exports.layers = exports.dataSource = void 0;
+var _layers = require("@deck.gl/layers");
+var _aggregationLayers = require("@deck.gl/aggregation-layers");
 // source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
 var dataSource = {
-  AIR_PORTS: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson"
+  AIR_PORTS: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson",
+  HEAT_MAPS: "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/screen-grid/uber-pickup-locations.json"
 };
 exports.dataSource = dataSource;
-var layers = [new _layers.GeoJsonLayer({
+var intensity = 1;
+var threshold = 0.03;
+var radiusPixels = 30;
+var layers = [new _aggregationLayers.HeatmapLayer({
+  data: dataSource.HEAT_MAPS,
+  id: "heatmp-layer",
+  pickable: false,
+  getPosition: function getPosition(d) {
+    return [d[0], d[1]];
+  },
+  getWeight: function getWeight(d) {
+    return d[2];
+  },
+  radiusPixels: radiusPixels,
+  intensity: intensity,
+  threshold: threshold
+})];
+exports.layers = layers;
+var layers1 = [new _layers.GeoJsonLayer({
   id: "airports",
   data: dataSource.AIR_PORTS,
   // Styles
@@ -58310,8 +64058,8 @@ var layers = [new _layers.GeoJsonLayer({
   },
   opacity: 0.3
 })];
-exports.layers = layers;
-},{"@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js"}],"node_modules/@here/xyz-maps-common/dist/xyz-maps-common.esm.min.js":[function(require,module,exports) {
+exports.layers1 = layers1;
+},{"@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","@deck.gl/aggregation-layers":"node_modules/@deck.gl/aggregation-layers/dist/esm/index.js"}],"node_modules/@here/xyz-maps-common/dist/xyz-maps-common.esm.min.js":[function(require,module,exports) {
 var global = arguments[3];
 "use strict";
 
@@ -65792,11 +71540,11 @@ function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input ==
 // XYZ Imports
 var YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 var INITIAL_VIEW_STATE = {
-  latitude: 51.47,
-  longitude: 0.45,
-  zoom: 4
+  longitude: -73.75,
+  latitude: 40.73,
+  zoom: 9
   // bearing: 0,
-  // pitch: 30,
+  // pitch: 0,
 };
 
 // Setup Deck GL
@@ -65811,18 +71559,18 @@ var deckgl = new _core.Deck((_Deck = {
   initialViewState: INITIAL_VIEW_STATE
 }, _defineProperty(_Deck, "controller", true), _defineProperty(_Deck, "style", {
   zIndex: "auto"
-}), _Deck));
+}), _defineProperty(_Deck, "views", new _core.MapView({
+  repeat: true
+})), _Deck));
 
 /** setup the XYZ map and "basemap" layer **/
 var baseMapLayer = new _xyzMapsCore.MVTLayer({
-  min: 3,
-  max: 20,
   name: "mvt-world-layer",
   zIndex: 1,
   remote: {
     url: "https://xyz.api.here.com/tiles/osmbase/512/all/{z}/{x}/{y}.mvt?access_token=" + YOUR_ACCESS_TOKEN
-  },
-  style: _style.style
+  }
+  // style: style,
 });
 
 // setup the Map Display
@@ -65845,6 +71593,10 @@ var map = new _xyzMapsDisplay.Map(document.getElementById("map-canvas"), {
   // rotate: 30,
 });
 
+// add renderers to window object
+window.xyzmap = map;
+window.deckoverlay = deckgl;
+
 /**
  * @map - { Map } from "@here/xyz-maps-display"
  * viewState : {
@@ -65856,25 +71608,25 @@ var map = new _xyzMapsDisplay.Map(document.getElementById("map-canvas"), {
     };
  */
 var updateMapCamera = function updateMapCamera(map, viewState) {
-  console.log(viewState);
+  // console.log(viewState);
+  var bbox = [[map.getViewBounds().maxLon, map.getViewBounds().maxLat], [map.getViewBounds().minLon, map.getViewBounds().maxLat]];
+  // console.log("bbox", bbox);
+  // const viewport = window.deckoverlay.getViewports()[0];
+  // const { latitude, longitude, zoom } = viewport.fitBounds(bbox);
+  // console.log(latitude, longitude, zoom);
+  // map.setCenter(latitude, longitude);
   map.setCenter(viewState.longitude, viewState.latitude);
   map.setZoomlevel(viewState.zoom);
+  console.log("map.getCenter: ", map.getCenter(), "zoom : ", map.getZoomlevel());
+  console.log("viewState: ", viewState);
 };
 deckgl.setProps({
   onViewStateChange: function onViewStateChange(_ref) {
     var viewState = _ref.viewState;
     return updateMapCamera(map, viewState);
-  },
-  onResize: function onResize(_ref2) {
-    var width = _ref2.width,
-      height = _ref2.height;
-    return map.resize(width, height);
   }
+  // onResize: ({ width, height }) => map.resize(width, height),
 });
-
-// add renderers to window object
-window.xyzmap = map;
-window.deckoverlay = deckgl;
 },{"@deck.gl/core":"node_modules/@deck.gl/core/dist/esm/index.js","./deckLayers":"src/deckLayers.js","@here/xyz-maps-display":"node_modules/@here/xyz-maps-display/dist/xyz-maps-display.esm.min.js","@here/xyz-maps-core":"node_modules/@here/xyz-maps-core/dist/xyz-maps-core.min.js","./style":"src/style.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
@@ -65900,7 +71652,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "36107" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "44357" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
