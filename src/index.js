@@ -33,8 +33,8 @@ const INITIAL_VIEW_STATE = {
 const deckgl = new Deck({
   layers:
     // layersWorldAirports,
-    // layerHeatMap,
-  layerScatterplot,
+    layerHeatMap,
+  // layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
