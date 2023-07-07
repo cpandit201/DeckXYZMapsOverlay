@@ -63975,19 +63975,44 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.layers1 = exports.layers = exports.dataSource = void 0;
+exports.layersWorldAirports = exports.layerScatterplot = exports.layerHeatMap = exports.dataSource = void 0;
 var _layers = require("@deck.gl/layers");
 var _aggregationLayers = require("@deck.gl/aggregation-layers");
 // source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
 var dataSource = {
   AIR_PORTS: "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson",
-  HEAT_MAPS: "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/screen-grid/uber-pickup-locations.json"
+  HEAT_MAPS: "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/screen-grid/uber-pickup-locations.json",
+  SCATTERPLOT_LAYER: "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/scatterplot/manhattan.json"
 };
+
+// HeatMaps new-york
 exports.dataSource = dataSource;
 var intensity = 1;
 var threshold = 0.03;
 var radiusPixels = 30;
-var layers = [new _aggregationLayers.HeatmapLayer({
+
+// Scatterplot new-york
+var maleColor = [0, 128, 255];
+var femaleColor = [255, 0, 128];
+var radius = 30;
+var layerScatterplot = [new _layers.ScatterplotLayer({
+  id: "scatter-plot",
+  data: dataSource.SCATTERPLOT_LAYER,
+  radiusScale: radius,
+  radiusMinPixels: 0.25,
+  getPosition: function getPosition(d) {
+    return [d[0], d[1], 0];
+  },
+  getFillColor: function getFillColor(d) {
+    return d[2] === 1 ? maleColor : femaleColor;
+  },
+  getRadius: 1,
+  updateTriggers: {
+    getFillColor: [maleColor, femaleColor]
+  }
+})];
+exports.layerScatterplot = layerScatterplot;
+var layerHeatMap = [new _aggregationLayers.HeatmapLayer({
   data: dataSource.HEAT_MAPS,
   id: "heatmp-layer",
   pickable: false,
@@ -64001,8 +64026,8 @@ var layers = [new _aggregationLayers.HeatmapLayer({
   intensity: intensity,
   threshold: threshold
 })];
-exports.layers = layers;
-var layers1 = [new _layers.GeoJsonLayer({
+exports.layerHeatMap = layerHeatMap;
+var layersWorldAirports = [new _layers.GeoJsonLayer({
   id: "airports",
   data: dataSource.AIR_PORTS,
   // Styles
@@ -64058,7 +64083,7 @@ var layers1 = [new _layers.GeoJsonLayer({
   },
   opacity: 0.3
 })];
-exports.layers1 = layers1;
+exports.layersWorldAirports = layersWorldAirports;
 },{"@deck.gl/layers":"node_modules/@deck.gl/layers/dist/esm/index.js","@deck.gl/aggregation-layers":"node_modules/@deck.gl/aggregation-layers/dist/esm/index.js"}],"node_modules/@here/xyz-maps-common/dist/xyz-maps-common.esm.min.js":[function(require,module,exports) {
 var global = arguments[3];
 "use strict";
@@ -71542,9 +71567,11 @@ var YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 var INITIAL_VIEW_STATE = {
   longitude: -73.75,
   latitude: 40.73,
-  zoom: 9
-  // bearing: 0,
-  // pitch: 0,
+  zoom: 9,
+  bearing: 0,
+  pitch: 0,
+  maxZoom: 18,
+  minZoom: 3
 };
 
 // Setup Deck GL
@@ -71552,7 +71579,10 @@ var deckgl = new _core.Deck((_Deck = {
   // parent: canvas,
   // parent: document.getElementById("deck-canvas"),
   controller: true,
-  layers: _deckLayers.layers,
+  layers:
+  // layersWorldAirports,
+  _deckLayers.layerHeatMap,
+  // layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
@@ -71561,7 +71591,7 @@ var deckgl = new _core.Deck((_Deck = {
   zIndex: "auto"
 }), _defineProperty(_Deck, "views", new _core.MapView({
   repeat: true
-})), _Deck));
+})), _defineProperty(_Deck, "debug", true), _Deck));
 
 /** setup the XYZ map and "basemap" layer **/
 var baseMapLayer = new _xyzMapsCore.MVTLayer({
@@ -71581,16 +71611,19 @@ var map = new _xyzMapsDisplay.Map(document.getElementById("map-canvas"), {
     latitude: INITIAL_VIEW_STATE.latitude
   },
   layers: [baseMapLayer],
+  minLevel: 4,
+  maxLevel: 19,
+  debug: false,
   behavior: {
     // allow map pitch by user interaction (mouse/touch)
-    // pitch: true,
+    pitch: false,
     // allow map rotation by user interaction (mouse/touch)
-    // rotate: true,
-  }
+    rotate: false
+  },
   // set initial map pitch in degrees
-  // pitch: 50,
+  pitch: 0,
   // set initial map rotation in degrees
-  // rotate: 30,
+  rotate: 0
 });
 
 // add renderers to window object
@@ -71609,21 +71642,23 @@ window.deckoverlay = deckgl;
  */
 var updateMapCamera = function updateMapCamera(map, viewState) {
   // console.log(viewState);
-  var bbox = [[map.getViewBounds().maxLon, map.getViewBounds().maxLat], [map.getViewBounds().minLon, map.getViewBounds().maxLat]];
-  // console.log("bbox", bbox);
-  // const viewport = window.deckoverlay.getViewports()[0];
-  // const { latitude, longitude, zoom } = viewport.fitBounds(bbox);
-  // console.log(latitude, longitude, zoom);
-  // map.setCenter(latitude, longitude);
+
   map.setCenter(viewState.longitude, viewState.latitude);
-  map.setZoomlevel(viewState.zoom);
-  console.log("map.getCenter: ", map.getCenter(), "zoom : ", map.getZoomlevel());
-  console.log("viewState: ", viewState);
+  map.setZoomlevel(viewState.zoom + 1);
+  var bbox = [[map.getViewBounds().maxLon, map.getViewBounds().maxLat], [map.getViewBounds().minLon, map.getViewBounds().maxLat]];
+  var viewport = deckgl.getViewports()[0];
+  console.log("viewport", viewport);
+  console.log("bbox", bbox);
+
+  // if (viewport !== undefined) {
+  //   viewport.fitBounds(bbox);
+  // }
 };
+
 deckgl.setProps({
   onViewStateChange: function onViewStateChange(_ref) {
     var viewState = _ref.viewState;
-    return updateMapCamera(map, viewState);
+    return updateMapCamera(map, viewState, deckgl);
   }
   // onResize: ({ width, height }) => map.resize(width, height),
 });

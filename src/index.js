@@ -34,8 +34,9 @@ const deckgl = new Deck({
   // parent: canvas,
   // parent: document.getElementById("deck-canvas"),
   controller: true,
-  layers: layersWorldAirports,
-  // layerHeatMap,
+  layers:
+    // layersWorldAirports,
+    layerHeatMap,
   // layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
