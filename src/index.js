@@ -1,7 +1,11 @@
 // Deck Imports
 import { Deck } from "@deck.gl/core";
 import { MapView } from "@deck.gl/core";
-import { layerScatterplot } from "./deckLayers";
+import {
+  layerScatterplot,
+  layerHeatMap,
+  layersWorldAirports,
+} from "./deckLayers";
 
 // XYZ Imports
 import { Map } from "@here/xyz-maps-display";
@@ -21,6 +25,8 @@ const INITIAL_VIEW_STATE = {
   zoom: 9,
   bearing: 0,
   pitch: 0,
+  maxZoom: 18,
+  minZoom: 3,
 };
 
 // Setup Deck GL
@@ -28,7 +34,9 @@ const deckgl = new Deck({
   // parent: canvas,
   // parent: document.getElementById("deck-canvas"),
   controller: true,
-  layers: layerScatterplot,
+  layers: layersWorldAirports,
+  // layerHeatMap,
+  // layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
@@ -61,9 +69,9 @@ const map = new Map(document.getElementById("map-canvas"), {
     latitude: INITIAL_VIEW_STATE.latitude,
   },
   layers: [baseMapLayer],
-  minLevel: 3,
+  minLevel: 4,
   maxLevel: 19,
-  debug: true,
+  debug: false,
   behavior: {
     // allow map pitch by user interaction (mouse/touch)
     pitch: false,
@@ -105,24 +113,9 @@ const updateMapCamera = (map, viewState) => {
   console.log("viewport", viewport);
   console.log("bbox", bbox);
 
-  if (viewport !== undefined) {
-    viewport.fitBounds(bbox);
-  }
-  // const { latitude, longitude, zoom } = viewport.fitBounds(bbox);
-  // console.log(latitude, longitude, zoom);
-  // map.setCenter(latitude, longitude);
-  // console.log(
-  //   "map.getCenter: ",
-  //   map.getCenter(),
-  //   "zoom : ",
-  //   map.getZoomlevel()
-  // );
-  // console.log("viewState: ", viewState);
-
-  // get the scale to convert from meters to pixel in webMercator space
-  // const scaleMeterToPixel = 1 / webMercator.earthCircumference(map.latitude);
-
-  // console.log("scaleMeterToPixel: ", scaleMeterToPixel);
+  // if (viewport !== undefined) {
+  //   viewport.fitBounds(bbox);
+  // }
 };
 
 deckgl.setProps({
