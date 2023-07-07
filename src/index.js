@@ -1,7 +1,7 @@
 // Deck Imports
 import { Deck } from "@deck.gl/core";
 import { MapView } from "@deck.gl/core";
-import { layers } from "./deckLayers";
+import { layerScatterplot } from "./deckLayers";
 
 // XYZ Imports
 import { Map } from "@here/xyz-maps-display";
@@ -19,8 +19,8 @@ const INITIAL_VIEW_STATE = {
   longitude: -73.75,
   latitude: 40.73,
   zoom: 9,
-  // bearing: 0,
-  // pitch: 0,
+  bearing: 0,
+  pitch: 0,
 };
 
 // Setup Deck GL
@@ -28,7 +28,7 @@ const deckgl = new Deck({
   // parent: canvas,
   // parent: document.getElementById("deck-canvas"),
   controller: true,
-  layers: layers,
+  layers: layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
@@ -38,6 +38,7 @@ const deckgl = new Deck({
   views: new MapView({
     repeat: true,
   }),
+  debug: true,
 });
 
 /** setup the XYZ map and "basemap" layer **/
@@ -60,16 +61,19 @@ const map = new Map(document.getElementById("map-canvas"), {
     latitude: INITIAL_VIEW_STATE.latitude,
   },
   layers: [baseMapLayer],
+  minLevel: 3,
+  maxLevel: 19,
+  debug: true,
   behavior: {
     // allow map pitch by user interaction (mouse/touch)
-    // pitch: true,
+    pitch: false,
     // allow map rotation by user interaction (mouse/touch)
-    // rotate: true,
+    rotate: false,
   },
   // set initial map pitch in degrees
-  // pitch: 50,
+  pitch: 0,
   // set initial map rotation in degrees
-  // rotate: 30,
+  rotate: 0,
 });
 
 // add renderers to window object
@@ -88,28 +92,40 @@ window.deckoverlay = deckgl;
  */
 const updateMapCamera = (map, viewState) => {
   // console.log(viewState);
+
+  map.setCenter(viewState.longitude, viewState.latitude);
+  map.setZoomlevel(viewState.zoom + 1);
+
   const bbox = [
     [map.getViewBounds().maxLon, map.getViewBounds().maxLat],
     [map.getViewBounds().minLon, map.getViewBounds().maxLat],
   ];
-  // console.log("bbox", bbox);
-  // const viewport = window.deckoverlay.getViewports()[0];
+
+  const viewport = deckgl.getViewports()[0];
+  console.log("viewport", viewport);
+  console.log("bbox", bbox);
+
+  if (viewport !== undefined) {
+    viewport.fitBounds(bbox);
+  }
   // const { latitude, longitude, zoom } = viewport.fitBounds(bbox);
   // console.log(latitude, longitude, zoom);
   // map.setCenter(latitude, longitude);
-  map.setCenter(viewState.longitude, viewState.latitude);
-  map.setZoomlevel(viewState.zoom);
+  // console.log(
+  //   "map.getCenter: ",
+  //   map.getCenter(),
+  //   "zoom : ",
+  //   map.getZoomlevel()
+  // );
+  // console.log("viewState: ", viewState);
 
-  console.log(
-    "map.getCenter: ",
-    map.getCenter(),
-    "zoom : ",
-    map.getZoomlevel()
-  );
-  console.log("viewState: ", viewState);
+  // get the scale to convert from meters to pixel in webMercator space
+  // const scaleMeterToPixel = 1 / webMercator.earthCircumference(map.latitude);
+
+  // console.log("scaleMeterToPixel: ", scaleMeterToPixel);
 };
 
 deckgl.setProps({
-  onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState),
+  onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState, deckgl),
   // onResize: ({ width, height }) => map.resize(width, height),
 });

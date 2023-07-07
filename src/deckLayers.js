@@ -9,13 +9,37 @@ export const dataSource = {
 
   HEAT_MAPS:
     "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/screen-grid/uber-pickup-locations.json",
+
+  SCATTERPLOT_LAYER:
+    "https://raw.githubusercontent.com/visgl/deck.gl-data/master/examples/scatterplot/manhattan.json",
 };
 
+// HeatMaps new-york
 const intensity = 1;
 const threshold = 0.03;
 const radiusPixels = 30;
 
-export const layers = [
+// Scatterplot new-york
+const maleColor = [0, 128, 255];
+const femaleColor = [255, 0, 128];
+const radius = 30;
+
+export const layerScatterplot = [
+  new ScatterplotLayer({
+    id: "scatter-plot",
+    data: dataSource.SCATTERPLOT_LAYER,
+    radiusScale: radius,
+    radiusMinPixels: 0.25,
+    getPosition: (d) => [d[0], d[1], 0],
+    getFillColor: (d) => (d[2] === 1 ? maleColor : femaleColor),
+    getRadius: 1,
+    updateTriggers: {
+      getFillColor: [maleColor, femaleColor],
+    },
+  }),
+];
+
+export const layerHeatMap = [
   new HeatmapLayer({
     data: dataSource.HEAT_MAPS,
     id: "heatmp-layer",
@@ -28,7 +52,7 @@ export const layers = [
   }),
 ];
 
-export const layers1 = [
+export const layersWorldAirports = [
   new GeoJsonLayer({
     id: "airports",
     data: dataSource.AIR_PORTS,
