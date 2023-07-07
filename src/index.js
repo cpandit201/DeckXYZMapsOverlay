@@ -20,9 +20,9 @@ const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
-  longitude: -73.75,
-  latitude: 40.73,
-  zoom: 9,
+  longitude: 3.913938149999676,//-73.75,
+  latitude: 40.00377770268809, //40.73,
+  zoom: 4,
   bearing: 0,
   pitch: 0,
   maxZoom: 18,
@@ -32,9 +32,9 @@ const INITIAL_VIEW_STATE = {
 // Setup Deck GL
 const deckgl = new Deck({
   layers:
-    // layersWorldAirports,
-    layerHeatMap,
-  // layerScatterplot,
+    layersWorldAirports,
+    // layerHeatMap,
+    // layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
@@ -56,7 +56,7 @@ const baseMapLayer = new MVTLayer({
       "https://xyz.api.here.com/tiles/osmbase/512/all/{z}/{x}/{y}.mvt?access_token=" +
       YOUR_ACCESS_TOKEN,
   },
-  // style: style,
+  style: style,
 });
 
 // setup the Map Display
