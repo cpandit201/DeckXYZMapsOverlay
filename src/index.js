@@ -31,13 +31,10 @@ const INITIAL_VIEW_STATE = {
 
 // Setup Deck GL
 const deckgl = new Deck({
-  // parent: canvas,
-  // parent: document.getElementById("deck-canvas"),
-  controller: true,
   layers:
     // layersWorldAirports,
-    layerHeatMap,
-  // layerScatterplot,
+    // layerHeatMap,
+  layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
