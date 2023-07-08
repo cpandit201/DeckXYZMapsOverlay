@@ -20,13 +20,16 @@ const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
-  longitude: 3.913938149999676,//-73.75,
-  latitude: 40.00377770268809, //40.73,
-  zoom: 4,
+  longitude: -0.6344016937504842,//-73.75,
+  latitude: 50.379981559115656, //40.73,
+  zoom: 6,
   bearing: 0,
   pitch: 0,
+
+  // Limits on DeckGL zoom levels mapping with HERE XYZ Maps
   maxZoom: 18,
   minZoom: 3,
+  maxPitch: 50,
 };
 
 // Setup Deck GL
@@ -72,9 +75,9 @@ const map = new Map(document.getElementById("map-canvas"), {
   debug: false,
   behavior: {
     // allow map pitch by user interaction (mouse/touch)
-    pitch: false,
+    pitch: true,
     // allow map rotation by user interaction (mouse/touch)
-    rotate: false,
+    rotate: true,
   },
   // set initial map pitch in degrees
   pitch: 0,
@@ -102,6 +105,9 @@ const updateMapCamera = (map, viewState) => {
   map.setCenter(viewState.longitude, viewState.latitude);
   map.setZoomlevel(viewState.zoom + 1);
 
+  map.pitch(viewState.pitch)
+  map.rotate(viewState.bearing * -1);
+
   const bbox = [
     [map.getViewBounds().maxLon, map.getViewBounds().maxLat],
     [map.getViewBounds().minLon, map.getViewBounds().maxLat],
@@ -118,5 +124,5 @@ const updateMapCamera = (map, viewState) => {
 
 deckgl.setProps({
   onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState, deckgl),
-  // onResize: ({ width, height }) => map.resize(width, height),
+  onResize: ({ width, height }) => map.resize(width, height),
 });
