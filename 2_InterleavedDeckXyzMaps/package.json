@@ -4,17 +4,15 @@
   "description": "",
   "main": "index.html",
   "scripts": {
-    "start": "../node_modules/.bin/parcel index.html",
-    "build": "../node_modules/.bin/parcel build index.html"
+    "start": "parcel index.html",
+    "build": "parcel build index.html"
   },
   "dependencies": {
-    "@deck.gl/aggregation-layers": "^8.9.19",
-    "@deck.gl/core": "^8.9.19",
-    "@deck.gl/layers": "^8.9.19",
+    "@deck.gl/core": "8.9.4",
+    "@deck.gl/layers": "8.9.4",
     "@here/xyz-maps-common": "0.32.0",
-    "@here/xyz-maps-core": "^0.32.0",
-    "@here/xyz-maps-display": "^0.32.0",
-    "@luma.gl/core": "^8.5.20",
+    "@here/xyz-maps-core": "0.32.0",
+    "@here/xyz-maps-display": "0.32.0",
     "deck.gl-leaflet": "^1.2.1",
     "leaflet": "^1.9.4",
     "mapbox-gl": "2.13.0",
