@@ -30,7 +30,6 @@ const baseMapLayer = new MVTLayer({
   style: style,
 });
 
-// const THREE;
 /** **/
 
 // setup the Map Display
@@ -74,45 +73,21 @@ class XYZMapsDeckOverlay extends CustomLayer {
 
     const deckgl = new Deck({
       parent: document.getElementById("xyzmap"),
+      // parent: canvas,
       initialViewState: viewState,
       controller: true,
       layers: [layers],
-      // style: { zIndex: "auto" },
+      style: { zIndex: "auto" },
     });
 
     window._deckGL = deckgl;
     this._deck = deckgl;
     this._map = map;
     // this._map = map;
-    updateDeckView(deckgl, map);
-    // const deck = new Deck({
-    //   parent: document.getElementById("xyzmap"),
-    //   controller: false,
-    //   // style: { zIndex: "auto" },
-    //   viewState,
-    // });
-
-    // this._container = document.getElementById("xyzmap");
-    // const _deck = new Deck({
-    //   // ...props,
-    //   parent: this._container,
-    //   controller: false,
-    //   // initialViewState: INITIAL_VIEW_STATE,
-    //   style: { zIndex: "auto" },
-    //   initialViewState: viewState,
-    // });
-    // window.deck = _deck;
-    // this._deck = _deck;
-    // console.log("onLayerAdd: ev", ev);
-
-    // const size = this._map.getSize();
-    // this._container.style.width = `${size.x}px`;
-    // this._container.style.height = `${size.y}px`;
+    // updateDeckView(deckgl, map);
   }
 
   render(context, matrix) {
-    // console.log("context: ", context);
-    // console.log("matrix: ", matrix);
     updateDeckView(this._deck, this._map);
   }
 
@@ -121,8 +96,6 @@ class XYZMapsDeckOverlay extends CustomLayer {
    * @returns {void}
    */
   setProps(props) {
-    // Object.assign(this.props, props);
-
     if (this._deck) {
       this._deck.setProps(props);
     }
@@ -145,7 +118,7 @@ function getViewState(map) {
   return {
     longitude: map.getCenter().longitude,
     latitude: map.getCenter().latitude,
-    zoom: map.getZoomlevel(),
+    zoom: map.getZoomlevel() - 1,
     pitch: 0,
     bearing: 0,
   };
@@ -157,7 +130,6 @@ function getViewState(map) {
  */
 export function updateDeckView(deck, map) {
   const viewState = getViewState(map);
-  // console.log(viewState);
 
   deck.setProps({ viewState });
   deck.redraw(false);
@@ -214,116 +186,9 @@ const layers = [
 ];
 
 const hereXyzMapsDeckOverlay = new XYZMapsDeckOverlay({
-  // zLayer: 1,
-  // zIndex: 9,
+  zLayer: 999,
+  zIndex: 999,
 });
 
 display.addLayer(hereXyzMapsDeckOverlay);
 hereXyzMapsDeckOverlay.setProps({ layers });
-
-// display.addLayer(baseMapLayer);
-
-////////////// XYZ Overlay end
-/******* Three JS */
-
-// let THREE;
-
-const mapCenter = display.getCenter();
-
-// place the model in the center of the map
-const modelPosition = [mapCenter.longitude, mapCenter.latitude, 0];
-
-// project to webMercator coordinates with a world size of 1.
-const modelPositionProjected = {
-  x: webMercator.lon2x(modelPosition[0], 1),
-  y: webMercator.lat2y(modelPosition[1], 1),
-  z: webMercator.alt2z(modelPosition[2], modelPosition[1]),
-};
-
-// get the scale to convert from meters to pixel in webMercator space
-const scaleMeterToPixel =
-  1 / webMercator.earthCircumference(mapCenter.latitude);
-
-// transform the model to fit map
-const modelTransformation = {
-  translateX: modelPositionProjected.x,
-  translateY: modelPositionProjected.y,
-  translateZ: modelPositionProjected.z,
-  rotateX: Math.PI / 2,
-  scale: scaleMeterToPixel,
-};
-
-// Use Threejs as an example of a custom renderer that's being integrated into the map by using the "CustomLayer" functionality.
-class MyCustomLayer extends CustomLayer {
-  min = 10;
-  max = 20;
-
-  renderOptions = {
-    mode: "3d",
-    zLayer: 1,
-    zIndex: 7,
-  };
-
-  onLayerAdd(ev) {
-    const { detail } = ev;
-    const { canvas, context } = detail;
-    console.log(ev);
-    this.camera = new THREE.Camera();
-    this.scene = new THREE.Scene();
-
-    // load the model
-    const loader = new THREE.GLTFLoader();
-    loader.load(
-      "https://xyz.api.here.com/maps/playground/assets/models/ML_HP/ML_HP.gltf",
-      (gltf) => this.scene.add(gltf.scene)
-    );
-
-    // Use two Directional lights to illuminate the model
-    const light1 = new THREE.DirectionalLight(0xffffff);
-    light1.position.set(200, 150, 50);
-    this.scene.add(light1);
-
-    const light2 = new THREE.DirectionalLight(0xffffff);
-    this.scene.add(light2);
-
-    this.renderer = new THREE.WebGLRenderer({ canvas, context });
-    this.renderer.autoClear = false;
-  }
-
-  render(context, matrix) {
-    const rotX = new THREE.Matrix4().makeRotationAxis(
-      new THREE.Vector3(1, 0, 0),
-      modelTransformation.rotateX
-    );
-
-    const modelMatrix = new THREE.Matrix4()
-      .makeTranslation(
-        modelTransformation.translateX,
-        modelTransformation.translateY,
-        modelTransformation.translateZ
-      )
-      .scale(
-        new THREE.Vector3(
-          modelTransformation.scale,
-          -modelTransformation.scale,
-          modelTransformation.scale
-        )
-      )
-      .multiply(rotX);
-
-    this.camera.projectionMatrix = new THREE.Matrix4()
-      .fromArray(matrix)
-      .multiply(modelMatrix);
-    this.renderer.resetState();
-    this.renderer.render(this.scene, this.camera);
-  }
-
-  camera;
-  scene;
-  renderer;
-}
-
-const myCustomLayer = new MyCustomLayer();
-
-display.addLayer(myCustomLayer);
-/*************Three JS End */
