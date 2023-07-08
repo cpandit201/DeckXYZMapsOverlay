@@ -20,13 +20,13 @@ const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
-  longitude: -0.6344016937504842,//-73.75,
-  latitude: 50.379981559115656, //40.73,
+  longitude: -0.634,//-73.75,
+  latitude: 50.379, //40.73,
   zoom: 6,
   bearing: 0,
-  pitch: 0,
+  pitch: 28.42639,
 
-  // Limits on DeckGL zoom levels mapping with HERE XYZ Maps
+  // Limit DeckGL zoomLevel mapping with HERE XYZ Maps
   maxZoom: 18,
   minZoom: 3,
   maxPitch: 50,
@@ -85,10 +85,6 @@ const map = new Map(document.getElementById("map-canvas"), {
   rotate: 0,
 });
 
-// add renderers to window object
-window.xyzmap = map;
-window.deckoverlay = deckgl;
-
 /**
  * @map - { Map } from "@here/xyz-maps-display"
  * viewState : {
@@ -100,29 +96,23 @@ window.deckoverlay = deckgl;
     };
  */
 const updateMapCamera = (map, viewState) => {
-  // console.log(viewState);
 
+  // Set the view state's lon/lat to ones mapping with XYZ Maps
   map.setCenter(viewState.longitude, viewState.latitude);
-  map.setZoomlevel(viewState.zoom + 1);
 
-  map.pitch(viewState.pitch)
+  // XYZ Maps roatation is negative of DeckGL
   map.rotate(viewState.bearing * -1);
+  map.pitch(viewState.pitch)
 
-  const bbox = [
-    [map.getViewBounds().maxLon, map.getViewBounds().maxLat],
-    [map.getViewBounds().minLon, map.getViewBounds().maxLat],
-  ];
-
-  const viewport = deckgl.getViewports()[0];
-  console.log("viewport", viewport);
-  console.log("bbox", bbox);
-
-  // if (viewport !== undefined) {
-  //   viewport.fitBounds(bbox);
-  // }
+  // Center of XYZ Maps is one level higher than deck's zoom level
+  map.setZoomlevel(viewState.zoom + 1);
 };
 
 deckgl.setProps({
   onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState, deckgl),
   onResize: ({ width, height }) => map.resize(width, height),
 });
+
+// optionally add renderers to window object
+window.xyzmap = map;
+window.deckoverlay = deckgl;
