@@ -1,4 +1,3 @@
 # DeckXYZMapsOverlay
 
-<img width="1168" alt="image" src="https://github.com/cpandit201/DeckXYZMapsOverlay/assets/42322819/eed47563-f5f5-42c3-abaf-366a1568238a">
-
+<img width="1157" alt="image" src="https://github.com/cpandit201/DeckXYZMapsOverlay/assets/42322819/df8c3d11-e8fb-4cd2-b405-0555e0f03f2c">
