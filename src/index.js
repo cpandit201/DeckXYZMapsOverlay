@@ -15,16 +15,17 @@ import {
   SpaceProvider,
   CustomLayer,
   webMercator,
+  IMLProvider,
 } from "@here/xyz-maps-core";
 const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
-  longitude: -0.634,//-73.75,
-  latitude: 50.379, //40.73,
-  zoom: 6,
+  longitude: -120.64021673968094, //-73.75,
+  latitude: 38.19311064138663, //40.73,
+  zoom: 6.3,
   bearing: 0,
-  pitch: 28.42639,
+  pitch: 0,
 
   // Limit DeckGL zoomLevel mapping with HERE XYZ Maps
   maxZoom: 18,
@@ -34,10 +35,9 @@ const INITIAL_VIEW_STATE = {
 
 // Setup Deck GL
 const deckgl = new Deck({
-  layers:
-    layersWorldAirports,
-    // layerHeatMap,
-    // layerScatterplot,
+  // layers: layersWorldAirports,
+  // layerHeatMap,
+  // layerScatterplot,
   canvas: "deck-canvas",
   width: "100%",
   height: "100%",
@@ -62,6 +62,30 @@ const baseMapLayer = new MVTLayer({
   style: style,
 });
 
+// From studio project - https://platform.here.com/studio/viewer?project_id=project-studio-t&artifact_hrn=hrn:here:artifact::olp-here:com.here.studio.project-studio-t:project-api:1.0.0&apiKey=PM6cqAYXuQJj6dVmW6C4y2fBNDn6cfDVuV2mIOGAICM
+const apiKey = "PM6cqAYXuQJj6dVmW6C4y2fBNDn6cfDVuV2mIOGAICM"; // "d-4UWghNKnFeM8UWf1vD4SSrdilMqBm1bawNzvcyYEo";
+const catalogHrn = "hrn:here:data::olp-here:f074b8-3c119a2fb";
+const layerId = "b6d9939";
+
+var flightRoutesURL = `https://interactive.data.api.platform.here.com/interactive/v1/catalogs/${catalogHrn}/layers/${layerId}/search?p.src=AIRPORTCODE&apiKey=${apiKey}&selection=-`;
+
+// create a TileLayer using a IMLProvider that's providing the map-data we want to display
+var imlLayer = new TileLayer({
+  // the minimum zoom level the layer should be visible
+  min: 3,
+  // the maximum zoom level the layer should be visible
+  max: 20,
+  // create the SpaceProvider
+  provider: new IMLProvider({
+    level: 10,
+    layer: layerId,
+    catalog: catalogHrn,
+    credentials: {
+      apiKey: apiKey,
+    },
+  }),
+});
+
 // setup the Map Display
 const map = new Map(document.getElementById("map-canvas"), {
   zoomlevel: INITIAL_VIEW_STATE.zoom,
@@ -69,7 +93,7 @@ const map = new Map(document.getElementById("map-canvas"), {
     longitude: INITIAL_VIEW_STATE.longitude,
     latitude: INITIAL_VIEW_STATE.latitude,
   },
-  layers: [baseMapLayer],
+  layers: [baseMapLayer, imlLayer],
   minLevel: 4,
   maxLevel: 19,
   debug: false,
@@ -96,13 +120,12 @@ const map = new Map(document.getElementById("map-canvas"), {
     };
  */
 const updateMapCamera = (map, viewState) => {
-
   // Set the view state's lon/lat to ones mapping with XYZ Maps
   map.setCenter(viewState.longitude, viewState.latitude);
 
   // XYZ Maps roatation is negative of DeckGL
   map.rotate(viewState.bearing * -1);
-  map.pitch(viewState.pitch)
+  map.pitch(viewState.pitch);
 
   // Center of XYZ Maps is one level higher than deck's zoom level
   map.setZoomlevel(viewState.zoom + 1);
