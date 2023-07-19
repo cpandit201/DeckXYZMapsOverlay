@@ -21,9 +21,9 @@ const YOUR_ACCESS_TOKEN = "AGB705k1T0Oyizl4K04zMwA";
 import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
-  longitude: -120.64021673968094, //-73.75,
-  latitude: 38.19311064138663, //40.73,
-  zoom: 6.3,
+  longitude: -122.229621,
+  latitude: 37.7820641,
+  zoom: 16,
   bearing: 0,
   pitch: 0,
 
@@ -86,6 +86,26 @@ var imlLayer = new TileLayer({
   }),
 });
 
+// create a TileLayer using a SpaceProvider that's providing the map-data we want to display
+var mySpaceLayer = new TileLayer({
+  // the minimum zoom level the layer should be visible
+  min: 3,
+  // the maximum zoom level the layer should be visible
+  max: 20,
+  // create the SpaceProvider
+  provider: new SpaceProvider({
+    // zoom level at which tiles are loaded and a local tile index gets created
+    level: 3,
+    // id of the space
+    space: '6HMU19KY',
+    // user credentials required by the xyz-hub remote service
+    credentials: {
+      access_token: YOUR_ACCESS_TOKEN
+    }
+  })
+});
+
+
 // setup the Map Display
 const map = new Map(document.getElementById("map-canvas"), {
   zoomlevel: INITIAL_VIEW_STATE.zoom,
@@ -93,7 +113,11 @@ const map = new Map(document.getElementById("map-canvas"), {
     longitude: INITIAL_VIEW_STATE.longitude,
     latitude: INITIAL_VIEW_STATE.latitude,
   },
-  layers: [baseMapLayer, imlLayer],
+  layers: [
+      baseMapLayer,
+      mySpaceLayer,
+      // imlLayer
+  ],
   minLevel: 4,
   maxLevel: 19,
   debug: false,
