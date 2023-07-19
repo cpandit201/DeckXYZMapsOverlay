@@ -23,7 +23,7 @@ import { style } from "./style";
 const INITIAL_VIEW_STATE = {
   longitude: -122.229621,
   latitude: 37.7820641,
-  zoom: 16,
+  zoom: 7,
   bearing: 0,
   pitch: 0,
 
@@ -77,7 +77,7 @@ var imlLayer = new TileLayer({
   max: 20,
   // create the SpaceProvider
   provider: new IMLProvider({
-    level: 10,
+    level: 3,
     layer: layerId,
     catalog: catalogHrn,
     credentials: {
@@ -116,11 +116,11 @@ const map = new Map(document.getElementById("map-canvas"), {
   layers: [
       baseMapLayer,
       mySpaceLayer,
-      // imlLayer
+      imlLayer
   ],
   minLevel: 4,
   maxLevel: 19,
-  debug: false,
+  // debug: false,
   behavior: {
     // allow map pitch by user interaction (mouse/touch)
     pitch: true,
