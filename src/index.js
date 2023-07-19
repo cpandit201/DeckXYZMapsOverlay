@@ -22,8 +22,8 @@ import { style } from "./style";
 
 const INITIAL_VIEW_STATE = {
   longitude: -120.64021673968094, //-73.75,
-  latitude: 38.19311064138663, //40.73,
-  zoom: 6.3,
+  latitude: 36.19311064138663, //40.73,
+  zoom: 7.3,
   bearing: 0,
   pitch: 0,
 
@@ -32,23 +32,6 @@ const INITIAL_VIEW_STATE = {
   minZoom: 3,
   maxPitch: 50,
 };
-
-// Setup Deck GL
-const deckgl = new Deck({
-  // layers: layersWorldAirports,
-  // layerHeatMap,
-  // layerScatterplot,
-  canvas: "deck-canvas",
-  width: "100%",
-  height: "100%",
-  initialViewState: INITIAL_VIEW_STATE,
-  controller: true,
-  style: { zIndex: "auto" },
-  views: new MapView({
-    repeat: true,
-  }),
-  debug: true,
-});
 
 /** setup the XYZ map and "basemap" layer **/
 const baseMapLayer = new MVTLayer({
@@ -77,7 +60,7 @@ var imlLayer = new TileLayer({
   max: 20,
   // create the SpaceProvider
   provider: new IMLProvider({
-    level: 10,
+    level: 3,
     layer: layerId,
     catalog: catalogHrn,
     credentials: {
@@ -109,33 +92,5 @@ const map = new Map(document.getElementById("map-canvas"), {
   rotate: 0,
 });
 
-/**
- * @map - { Map } from "@here/xyz-maps-display"
- * viewState : {
-      latitude: number,
-      longitude: number,
-      zoom: number,
-      bearing: number,
-      pitch: number,
-    };
- */
-const updateMapCamera = (map, viewState) => {
-  // Set the view state's lon/lat to ones mapping with XYZ Maps
-  map.setCenter(viewState.longitude, viewState.latitude);
-
-  // XYZ Maps roatation is negative of DeckGL
-  map.rotate(viewState.bearing * -1);
-  map.pitch(viewState.pitch);
-
-  // Center of XYZ Maps is one level higher than deck's zoom level
-  map.setZoomlevel(viewState.zoom + 1);
-};
-
-deckgl.setProps({
-  onViewStateChange: ({ viewState }) => updateMapCamera(map, viewState, deckgl),
-  onResize: ({ width, height }) => map.resize(width, height),
-});
-
 // optionally add renderers to window object
 window.xyzmap = map;
-window.deckoverlay = deckgl;
